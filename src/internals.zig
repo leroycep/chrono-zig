@@ -64,6 +64,10 @@ pub const YearFlags = packed struct {
     pub fn ndays(this: @This()) u32 {
         return @as(u32, 366) - (this.flags >> 3);
     }
+
+    pub fn nisoweeks(this: @This()) u32 {
+        return 52 + ((@as(u32, 0b0000010000000110) >> @intCast(u5, this.flags)) & 1);
+    }
 };
 
 test "year flags number of days from year" {
@@ -80,4 +84,21 @@ test "year flags number of days from year" {
     expectEqual(@as(u32, 365), YearFlags.from_year(-100).ndays()); // 101 BCE
     expectEqual(@as(u32, 365), YearFlags.from_year(-399).ndays()); // 400 BCE
     expectEqual(@as(u32, 366), YearFlags.from_year(-400).ndays()); // 401 BCE
+}
+
+test "year flags number of iso weeks" {
+    expectEqual(@as(u32, 52), YearFlags.A.nisoweeks());
+    expectEqual(@as(u32, 52), YearFlags.B.nisoweeks());
+    expectEqual(@as(u32, 52), YearFlags.C.nisoweeks());
+    expectEqual(@as(u32, 53), YearFlags.D.nisoweeks());
+    expectEqual(@as(u32, 52), YearFlags.E.nisoweeks());
+    expectEqual(@as(u32, 52), YearFlags.F.nisoweeks());
+    expectEqual(@as(u32, 52), YearFlags.G.nisoweeks());
+    expectEqual(@as(u32, 52), YearFlags.AG.nisoweeks());
+    expectEqual(@as(u32, 52), YearFlags.BA.nisoweeks());
+    expectEqual(@as(u32, 52), YearFlags.CB.nisoweeks());
+    expectEqual(@as(u32, 53), YearFlags.DC.nisoweeks());
+    expectEqual(@as(u32, 53), YearFlags.ED.nisoweeks());
+    expectEqual(@as(u32, 52), YearFlags.FE.nisoweeks());
+    expectEqual(@as(u32, 52), YearFlags.GF.nisoweeks());
 }
