@@ -1,6 +1,10 @@
 const std = @import("std");
 const expectEqual = std.testing.expectEqual;
 
+pub const YearInt = u19;
+pub const OrdinalInt = u9;
+pub const MonthInt = u4;
+pub const DayInt = u5;
 const DateImpl = i32;
 
 const MAX_YEAR = std.math.maxInt(DateImpl) >> 13;
@@ -259,16 +263,16 @@ const OL_TO_MDL = [MAX_OL + 1]u8{
 
 /// Ordinal day of year and year flags
 pub const Of = struct {
-    ordinal: u9,
+    ordinal: OrdinalInt,
     year_flags: YearFlags,
 
     // TODO: Make this packed once packed structs aren't bugged
 
-    pub fn clamp_ordinal(ordinal: u32) u9 {
+    pub fn clamp_ordinal(ordinal: u32) OrdinalInt {
         if (ordinal > 366) {
             return 0;
         } else {
-            return @intCast(u9, ordinal);
+            return @intCast(OrdinalInt, ordinal);
         }
     }
 
@@ -287,7 +291,7 @@ pub const Of = struct {
             var ord = mdl;
             ord -%= @as(u11, @bitCast(u8, MDL_TO_OL[mdl])) & 0x3ff;
             return Of{
-                .ordinal = @intCast(u9, ord >> 1),
+                .ordinal = @intCast(OrdinalInt, ord >> 1),
                 .year_flags = mdf.year_flags,
             };
         } else {
@@ -333,23 +337,23 @@ test "ordinal + year flags" {
 
 /// Month, day of month, and year flags
 pub const Mdf = struct {
-    month: u4,
-    day: u5,
+    month: MonthInt,
+    day: DayInt,
     year_flags: YearFlags,
 
-    pub fn clamp_month(month: u32) u4 {
+    pub fn clamp_month(month: u32) MonthInt {
         if (month > 12) {
             return 0;
         } else {
-            return @intCast(u4, month);
+            return @intCast(MonthInt, month);
         }
     }
 
-    pub fn clamp_day(day: u32) u5 {
+    pub fn clamp_day(day: u32) DayInt {
         if (day > 31) {
             return 0;
         } else {
-            return @intCast(u5, day);
+            return @intCast(DayInt, day);
         }
     }
 
