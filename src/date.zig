@@ -41,11 +41,25 @@ pub const NaiveDate = struct {
     }
 
     pub fn succ(this: @This()) ?@This() {
-        var of = this.of.succ();
+        const of = this.of.succ();
         if (!of.valid()) {
             var new_year: YearInt = undefined;
             if (@addWithOverflow(YearInt, this.year, 1, &new_year)) return null;
             return yo(new_year, 1);
+        } else {
+            return @This(){
+                .year = this.year,
+                .of = of,
+            };
+        }
+    }
+
+    pub fn pred(this: @This()) ?@This() {
+        const of = this.of.pred();
+        if (!of.valid()) {
+            var new_year: YearInt = undefined;
+            if (@subWithOverflow(YearInt, this.year, 1, &new_year)) return null;
+            return ymd(new_year, 12, 31);
         } else {
             return @This(){
                 .year = this.year,
@@ -108,4 +122,13 @@ test "date successor" {
     std.testing.expectEqual(ymd(2015, 1, 1).?, ymd(2014, 12, 31).?.succ().?);
     std.testing.expectEqual(ymd(2016, 2, 29).?, ymd(2016, 2, 28).?.succ().?);
     std.testing.expectEqual(@as(?NaiveDate, null), ymd(MAX_YEAR, 12, 31).?.succ());
+}
+
+test "date predecessor" {
+    const ymd = NaiveDate.ymd;
+    std.testing.expectEqual(ymd(2016, 2, 29).?, ymd(2016, 3, 1).?.pred().?);
+    std.testing.expectEqual(ymd(2014, 12, 31).?, ymd(2015, 1, 1).?.pred().?);
+    std.testing.expectEqual(ymd(2014, 5, 31).?, ymd(2014, 6, 1).?.pred().?);
+    std.testing.expectEqual(ymd(2014, 5, 6).?, ymd(2014, 5, 7).?.pred().?);
+    std.testing.expectEqual(@as(?NaiveDate, null), ymd(MIN_YEAR, 1, 1).?.pred());
 }

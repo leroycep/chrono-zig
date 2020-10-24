@@ -309,6 +309,13 @@ pub const Of = struct {
             .year_flags = this.year_flags,
         };
     }
+
+    pub fn pred(this: @This()) @This() {
+        return @This(){
+            .ordinal = this.ordinal - 1,
+            .year_flags = this.year_flags,
+        };
+    }
 };
 
 const NONLEAP_FLAGS = [7]YearFlags{ A, B, C, D, E, F, G };
