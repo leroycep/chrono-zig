@@ -31,12 +31,12 @@ pub const NaiveDate = struct {
         return ymd_opt(year, month, day).?;
     }
 
-    pub fn yo_opt(year: YearInt, ordinal: OrdinalInt) ?@This() {
+    pub fn yo_opt(year: i32, ordinal: OrdinalInt) ?@This() {
         const flags = internals.YearFlags.from_year(year);
         const of = internals.Of.new(ordinal, flags);
-        if (of.valid()) {
+        if (MIN_YEAR <= year and year <= MAX_YEAR and of.valid()) {
             return @This(){
-                .year = year,
+                .year = @intCast(YearInt, year),
                 .of = of,
             };
         } else {
@@ -46,6 +46,20 @@ pub const NaiveDate = struct {
 
     pub fn yo(year: YearInt, ordinal: OrdinalInt) @This() {
         return yo_opt(year, ordinal).?;
+    }
+
+    pub fn succ(this: @This()) ?@This() {
+        var of = this.of.succ();
+        if (!of.valid()) {
+            var new_year: YearInt = undefined;
+            if (@addWithOverflow(YearInt, this.year, 1, &new_year)) return null;
+            return yo_opt(new_year, 1);
+        } else {
+            return @This(){
+                .year = this.year,
+                .of = of,
+            };
+        }
     }
 };
 
@@ -94,4 +108,13 @@ test "date from year-ordinal" {
     std.testing.expectEqual(ymd(2014, 10, 27), yo(2014, 300));
     std.testing.expectEqual(ymd(2014, 12, 31), yo(2014, 365));
     std.testing.expectEqual(null_date, yo_opt(2014, 366));
+}
+
+test "date successor" {
+    const ymd_opt = NaiveDate.ymd_opt;
+    std.testing.expectEqual(ymd_opt(2014, 5, 7).?, ymd_opt(2014, 5, 6).?.succ().?);
+    std.testing.expectEqual(ymd_opt(2014, 6, 1).?, ymd_opt(2014, 5, 31).?.succ().?);
+    std.testing.expectEqual(ymd_opt(2015, 1, 1).?, ymd_opt(2014, 12, 31).?.succ().?);
+    std.testing.expectEqual(ymd_opt(2016, 2, 29).?, ymd_opt(2016, 2, 28).?.succ().?);
+    std.testing.expectEqual(@as(?NaiveDate, null), ymd_opt(MAX_YEAR, 12, 31).?.succ());
 }

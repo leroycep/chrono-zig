@@ -1,14 +1,13 @@
 const std = @import("std");
 const expectEqual = std.testing.expectEqual;
 
-pub const YearInt = u19;
+pub const YearInt = i19;
 pub const OrdinalInt = u9;
 pub const MonthInt = u4;
 pub const DayInt = u5;
-const DateImpl = i32;
 
-const MAX_YEAR = std.math.maxInt(DateImpl) >> 13;
-const MIN_YEAR = std.math.minInt(DateImpl) >> 13;
+pub const MAX_YEAR = std.math.maxInt(YearInt);
+pub const MIN_YEAR = std.math.minInt(YearInt);
 
 pub const A = YearFlags{ .flags = 0o15 };
 pub const AG = YearFlags{ .flags = 0o05 };
@@ -302,6 +301,13 @@ pub const Of = struct {
     pub fn valid(this: @This()) bool {
         const ol = (@intCast(u10, this.ordinal) << 1) | (this.year_flags.flags >> 3);
         return MIN_OL <= ol and ol <= MAX_OL;
+    }
+
+    pub fn succ(this: @This()) @This() {
+        return @This(){
+            .ordinal = this.ordinal + 1,
+            .year_flags = this.year_flags,
+        };
     }
 };
 
