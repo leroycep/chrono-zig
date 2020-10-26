@@ -111,6 +111,13 @@ pub const NaiveTime = struct {
             .frac = this.frac,
         };
     }
+
+    pub fn from_num_seconds_from_midnight(secs: u32, nano: u32) ?@This() {
+        if (secs >= std.time.s_per_day or nano >= MAX_FRAC) {
+            return null;
+        }
+        return @This(){ .secs = @intCast(SecsInt, secs), .frac = @intCast(FracInt, nano) };
+    }
 };
 
 test "time hour, minute, second" {

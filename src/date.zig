@@ -5,31 +5,18 @@ const MonthInt = internals.MonthInt;
 const DayInt = internals.DayInt;
 const OrdinalInt = internals.OrdinalInt;
 const YearFlags = internals.YearFlags;
+const Of = internals.Of;
 const MIN_YEAR = internals.MIN_YEAR;
 const MAX_YEAR = internals.MAX_YEAR;
+const NaiveTime = @import("./time.zig").NaiveTime;
+const NaiveDateTime = @import("./datetime.zig").NaiveDateTime;
 
 // TODO: Make packed once packed structs aren't bugged
 pub const NaiveDate = struct {
     year: YearInt,
     of: internals.Of,
 
-    pub fn ymd(year: YearInt, month: MonthInt, day: DayInt) ?@This() {
-        const flags = internals.YearFlags.from_year(year);
-        const mdf = internals.Mdf.new(month, day, flags);
-        const of = mdf.to_of();
-        if (of.valid()) {
-            return @This(){
-                .year = year,
-                .of = mdf.to_of(),
-            };
-        } else {
-            return null;
-        }
-    }
-
-    pub fn yo(year: i32, ordinal: OrdinalInt) ?@This() {
-        const flags = internals.YearFlags.from_year(year);
-        const of = internals.Of.new(ordinal, flags);
+    pub fn from_of(year: i32, of: Of) ?@This() {
         if (MIN_YEAR <= year and year <= MAX_YEAR and of.valid()) {
             return @This(){
                 .year = @intCast(YearInt, year),
@@ -38,6 +25,19 @@ pub const NaiveDate = struct {
         } else {
             return null;
         }
+    }
+
+    pub fn ymd(year: i32, month: MonthInt, day: DayInt) ?@This() {
+        const flags = internals.YearFlags.from_year(year);
+        const mdf = internals.Mdf.new(month, day, flags);
+        const of = mdf.to_of();
+        return from_of(year, of);
+    }
+
+    pub fn yo(year: i32, ordinal: OrdinalInt) ?@This() {
+        const flags = internals.YearFlags.from_year(year);
+        const of = internals.Of.new(ordinal, flags);
+        return from_of(year, of);
     }
 
     pub fn succ(this: @This()) ?@This() {
@@ -66,6 +66,25 @@ pub const NaiveDate = struct {
                 .of = of,
             };
         }
+    }
+
+    pub fn hms(this: @This(), hour: u32, minute: u32, second: u32) ?NaiveDateTime {
+        const time = NaiveTime.hms(hour, minute, second) orelse return null;
+        return NaiveDateTime.new(this, time);
+    }
+
+    const DAYS_IN_400_YEARS = 146097;
+
+    pub fn from_num_days_from_ce(days: i32) ?@This() {
+        const days_1bce = days + 365;
+
+        const year_div_400 = @divFloor(days_1bce, DAYS_IN_400_YEARS);
+        const cycle = @mod(days_1bce, DAYS_IN_400_YEARS);
+
+        const res = internals.cycle_to_yo(@intCast(u32, cycle));
+        const flags = YearFlags.from_year_mod_400(res.year_mod_400);
+
+        return NaiveDate.from_of(year_div_400 * 400 + @intCast(i32, res.year_mod_400), Of.new(res.ordinal, flags));
     }
 };
 
