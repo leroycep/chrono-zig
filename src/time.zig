@@ -9,21 +9,21 @@ pub const MAX_HOURS = 24;
 pub const HoursInt = @Type(.{
     .Int = .{
         .bits = std.math.log2_int_ceil(u64, MAX_HOURS),
-        .is_signed = false,
+        .signedness = .unsigned,
     },
 });
 
 pub const MinutesInt = @Type(.{
     .Int = .{
         .bits = std.math.log2_int_ceil(u64, min_per_hour),
-        .is_signed = false,
+        .signedness = .unsigned,
     },
 });
 
 pub const SecondsInt = @Type(.{
     .Int = .{
         .bits = std.math.log2_int_ceil(u64, s_per_min),
-        .is_signed = false,
+        .signedness = .unsigned,
     },
 });
 
@@ -32,7 +32,7 @@ pub const SECONDS_PER_DAY = MAX_HOURS * std.time.s_per_hour;
 pub const SecsInt = @Type(.{
     .Int = .{
         .bits = std.math.log2_int_ceil(u64, SECONDS_PER_DAY),
-        .is_signed = false,
+        .signedness = .unsigned,
     },
 });
 
@@ -41,7 +41,7 @@ pub const MAX_FRAC = 2 * std.time.ns_per_ms;
 pub const FracInt = @Type(.{
     .Int = .{
         .bits = std.math.log2_int_ceil(u64, MAX_FRAC),
-        .is_signed = false,
+        .signedness = .unsigned,
     },
 });
 
