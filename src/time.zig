@@ -118,6 +118,32 @@ pub const NaiveTime = struct {
         }
         return @This(){ .secs = @intCast(SecsInt, secs), .frac = @intCast(FracInt, nano) };
     }
+
+    pub fn signed_duration_since(this: @This(), other: @This()) i64 {
+        const secs = @intCast(i64, this.secs) - @intCast(i64, other.secs);
+        // TODO: Return some kind of duration that includes nanoseconds
+        //const frac = @intCast(i64, this.frac) - @intCast(i64, other.frac);
+        std.log.warn("secs: {} - {} = {}", .{this.secs, other.secs, secs});
+
+        const adjust = if (this.secs > other.secs) gt: {
+            if (other.frac >= 1_000_000_000) {
+                break :gt @as(i64, 1);
+            } else {
+                break :gt @as(i64, 0);
+            }
+        } else if (this.secs < other.secs) lt: {
+            if (other.frac >= 1_000_000_000) {
+                break :lt @as(i64, -1);
+            } else {
+                break :lt @as(i64, 0);
+            }
+        } else eq: {
+            break :eq @as(i64, 0);
+        };
+
+        std.log.warn("secs: {}, adjust: {}", .{secs, adjust});
+        return secs + adjust;
+    }
 };
 
 test "time hour, minute, second" {
@@ -138,4 +164,10 @@ test "time hour, minute, second" {
     std.testing.expectEqual(NaiveTime.hms(3, 5, 59), NaiveTime.hms(3, 5, 7).?.with_second(59));
     std.testing.expectEqual(@as(?NaiveTime, null), NaiveTime.hms(3, 5, 7).?.with_second(60));
     std.testing.expectEqual(@as(?NaiveTime, null), NaiveTime.hms(3, 5, 7).?.with_second(std.math.maxInt(MinutesInt)));
+}
+
+test "time signed duration since" {
+    const hms = NaiveTime.hms;
+    std.testing.expectEqual(@as(i64, 3600), hms(23, 0, 0).?.signed_duration_since(hms(22, 0, 0).?));
+    std.testing.expectEqual(@as(i64, 79_200), hms(22, 0, 0).?.signed_duration_since(hms(0, 0, 0).?));
 }

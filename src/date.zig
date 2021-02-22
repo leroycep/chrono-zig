@@ -13,57 +13,57 @@ const NaiveDateTime = @import("./datetime.zig").NaiveDateTime;
 
 // TODO: Make packed once packed structs aren't bugged
 pub const NaiveDate = struct {
-    year: YearInt,
-    of: internals.Of,
+    _year: YearInt,
+    _of: internals.Of,
 
-    pub fn from_of(year: i32, of: Of) ?@This() {
-        if (MIN_YEAR <= year and year <= MAX_YEAR and of.valid()) {
+    pub fn from_of(year_param: i32, of: Of) ?@This() {
+        if (MIN_YEAR <= year_param and year_param <= MAX_YEAR and of.valid()) {
             return @This(){
-                .year = @intCast(YearInt, year),
-                .of = of,
+                ._year = @intCast(YearInt, year_param),
+                ._of = of,
             };
         } else {
             return null;
         }
     }
 
-    pub fn ymd(year: i32, month: MonthInt, day: DayInt) ?@This() {
-        const flags = internals.YearFlags.from_year(year);
+    pub fn ymd(year_param: i32, month: MonthInt, day: DayInt) ?@This() {
+        const flags = internals.YearFlags.from_year(year_param);
         const mdf = internals.Mdf.new(month, day, flags);
         const of = mdf.to_of();
-        return from_of(year, of);
+        return from_of(year_param, of);
     }
 
-    pub fn yo(year: i32, ordinal: OrdinalInt) ?@This() {
-        const flags = internals.YearFlags.from_year(year);
+    pub fn yo(year_param: i32, ordinal: OrdinalInt) ?@This() {
+        const flags = internals.YearFlags.from_year(year_param);
         const of = internals.Of.new(ordinal, flags);
-        return from_of(year, of);
+        return from_of(year_param, of);
     }
 
     pub fn succ(this: @This()) ?@This() {
-        const of = this.of.succ();
+        const of = this._of.succ();
         if (!of.valid()) {
             var new_year: YearInt = undefined;
-            if (@addWithOverflow(YearInt, this.year, 1, &new_year)) return null;
+            if (@addWithOverflow(YearInt, this._year, 1, &new_year)) return null;
             return yo(new_year, 1);
         } else {
             return @This(){
-                .year = this.year,
-                .of = of,
+                ._year = this._year,
+                ._of = of,
             };
         }
     }
 
     pub fn pred(this: @This()) ?@This() {
-        const of = this.of.pred();
+        const of = this._of.pred();
         if (!of.valid()) {
             var new_year: YearInt = undefined;
-            if (@subWithOverflow(YearInt, this.year, 1, &new_year)) return null;
+            if (@subWithOverflow(YearInt, this._year, 1, &new_year)) return null;
             return ymd(new_year, 12, 31);
         } else {
             return @This(){
-                .year = this.year,
-                .of = of,
+                ._year = this._year,
+                ._of = of,
             };
         }
     }
@@ -73,7 +73,7 @@ pub const NaiveDate = struct {
         return NaiveDateTime.new(this, time);
     }
 
-    const DAYS_IN_400_YEARS = 146097;
+    const DAYS_IN_400_YEARS = 146_097;
 
     pub fn from_num_days_from_ce(days: i32) ?@This() {
         const days_1bce = days + 365;
@@ -85,6 +85,24 @@ pub const NaiveDate = struct {
         const flags = YearFlags.from_year_mod_400(res.year_mod_400);
 
         return NaiveDate.from_of(year_div_400 * 400 + @intCast(i32, res.year_mod_400), Of.new(res.ordinal, flags));
+    }
+
+    pub fn year(this: @This()) YearInt {
+        return this._year;
+    }
+
+    pub fn signed_duration_since(this: @This(), other: @This()) i64 {
+        const year1 = this.year();
+        const year1_div_400 = @intCast(i64, @divFloor(year1, 400));
+        const year1_mod_400 = @mod(year1, 400);
+        const cycle1 = @intCast(i64, internals.yo_to_cycle(@intCast(u32, year1_mod_400), this._of.ordinal));
+
+        const year2 = other.year();
+        const year2_div_400 = @intCast(i64, @divFloor(year2, 400));
+        const year2_mod_400 = @mod(year2, 400);
+        const cycle2 = @intCast(i64, internals.yo_to_cycle(@intCast(u32, year2_mod_400), other._of.ordinal));
+
+        return ((year1_div_400 - year2_div_400) * DAYS_IN_400_YEARS + (cycle1 - cycle2)) * std.time.s_per_day;
     }
 };
 
@@ -150,4 +168,10 @@ test "date predecessor" {
     std.testing.expectEqual(ymd(2014, 5, 31).?, ymd(2014, 6, 1).?.pred().?);
     std.testing.expectEqual(ymd(2014, 5, 6).?, ymd(2014, 5, 7).?.pred().?);
     std.testing.expectEqual(@as(?NaiveDate, null), ymd(MIN_YEAR, 1, 1).?.pred());
+}
+
+test "date signed duration since" {
+    const ymd = NaiveDate.ymd;
+    std.testing.expectEqual(@as(i64, 86400), ymd(2016, 3, 1).?.signed_duration_since(ymd(2016, 2, 29).?));
+    std.testing.expectEqual(@as(i64, 1613952000), ymd(2021, 2, 22).?.signed_duration_since(ymd(1970, 1, 1).?));
 }

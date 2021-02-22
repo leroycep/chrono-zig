@@ -62,8 +62,12 @@ pub fn cycle_to_yo(cycle: u32) struct {year_mod_400: u32, ordinal: u32} {
     };
 }
 
+pub fn yo_to_cycle(year_mod_400: u32, ordinal: u32) u32 {
+    return year_mod_400 * 365 + YEAR_DELTAS[year_mod_400] + ordinal - 1;
+}
+
 pub const YearFlags = packed struct {
-    flags: u8,
+    flags: u4,
 
     pub const MOD_400_TO_FLAGS = [400]YearFlags{
         BA, G,  F,  E,  DC, B,  A,  G,  FE, D,  C,  B,  AG, F,  E,
@@ -112,7 +116,11 @@ pub const YearFlags = packed struct {
     }
 
     pub fn nisoweeks(this: @This()) u32 {
-        return 52 + ((@as(u32, 0b0000010000000110) >> @intCast(u5, this.flags)) & 1);
+        return 52 + ((@as(u32, 0b0000_0100_0000_0110) >> this.flags) & 1);
+    }
+    
+    pub fn isleapyear(this: @This()) bool {
+        return this.flags & 0b1000 == 0;
     }
 };
 
@@ -130,6 +138,22 @@ test "year flags number of days from year" {
     expectEqual(@as(u32, 365), YearFlags.from_year(-100).ndays()); // 101 BCE
     expectEqual(@as(u32, 365), YearFlags.from_year(-399).ndays()); // 400 BCE
     expectEqual(@as(u32, 366), YearFlags.from_year(-400).ndays()); // 401 BCE
+}
+
+test "year flags is leap year from year" {
+    std.testing.expect(!YearFlags.from_year(2014).isleapyear());
+    std.testing.expect(YearFlags.from_year(2012).isleapyear());
+    std.testing.expect(YearFlags.from_year(2000).isleapyear());
+    std.testing.expect(!YearFlags.from_year(1900).isleapyear());
+    std.testing.expect(YearFlags.from_year(1600).isleapyear());
+    std.testing.expect(!YearFlags.from_year(1).isleapyear());
+    std.testing.expect(YearFlags.from_year(0).isleapyear()); // 1 BCE (proleptic Gregorian)
+    std.testing.expect(!YearFlags.from_year(-1).isleapyear()); // 2 BCE
+    std.testing.expect(YearFlags.from_year(-4).isleapyear()); // 5 BCE
+    std.testing.expect(!YearFlags.from_year(-99).isleapyear()); // 100 BCE
+    std.testing.expect(!YearFlags.from_year(-100).isleapyear()); // 101 BCE
+    std.testing.expect(!YearFlags.from_year(-399).isleapyear()); // 400 BCE
+    std.testing.expect(YearFlags.from_year(-400).isleapyear()); // 401 BCE
 }
 
 test "year flags number of iso weeks" {
