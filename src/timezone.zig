@@ -12,7 +12,7 @@ pub const TimeZone = union(enum) {
     /// IANA timezone specification RFC 8536
     TZif: tzif.TimeZone,
 
-    pub fn loadTZif(allocator: *std.mem.Allocator, path: []const u8) !This() {
+    pub fn loadTZif(allocator: *std.mem.Allocator, path: []const u8) !@This() {
         return TimeZone{
             .TZif = try tzif.parseFile(allocator, path),
         };
@@ -44,4 +44,11 @@ pub const TimeZone = union(enum) {
 
 test "" {
     @import("std").testing.refAllDecls(@This());
+}
+
+test "Load TZif file" {
+    const utc = try TimeZone.loadTZif(std.testing.allocator, "src/timezone/zoneinfo/UTC");
+    defer utc.deinit();
+    const honolulu = try TimeZone.loadTZif(std.testing.allocator, "src/timezone/zoneinfo/Pacific/Honolulu");
+    defer honolulu.deinit();
 }

@@ -123,7 +123,6 @@ pub const NaiveTime = struct {
         const secs = @intCast(i64, this.secs) - @intCast(i64, other.secs);
         // TODO: Return some kind of duration that includes nanoseconds
         //const frac = @intCast(i64, this.frac) - @intCast(i64, other.frac);
-        std.log.warn("secs: {} - {} = {}", .{this.secs, other.secs, secs});
 
         const adjust = if (this.secs > other.secs) gt: {
             if (other.frac >= 1_000_000_000) {
@@ -141,7 +140,6 @@ pub const NaiveTime = struct {
             break :eq @as(i64, 0);
         };
 
-        std.log.warn("secs: {}, adjust: {}", .{secs, adjust});
         return secs + adjust;
     }
 };
