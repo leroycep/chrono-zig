@@ -79,12 +79,21 @@ pub fn formatNaiveDateTime(writer: anytype, comptime format: []const u8, dt: Nai
     inline for (format) |fc| {
         if (next_char_is_specifier) {
             switch (fc) {
+                'F' => try writer.print("{d}-{d:0>2}-{d:0>2}", .{dt.year(), dt.month(), dt.day()}),
                 'Y' => try writer.print("{d}", .{dt.year()}),
                 'm' => try writer.print("{d:0>2}", .{dt.month()}),
                 'd' => try writer.print("{d:0>2}", .{dt.day()}),
+
+                // Time specifiers
                 'H' => try writer.print("{d:0>2}", .{dt.hour()}),
                 'M' => try writer.print("{d:0>2}", .{dt.minute()}),
                 'S' => try writer.print("{d:0>2}", .{dt.second()}),
+
+                // Combined time specifiers
+                'R' => try writer.print("{d:0>2}:{d:0>2}", .{dt.hour(), dt.minute()}),
+                'T' => try writer.print("{d:0>2}:{d:0>2}:{d:0>2}", .{dt.hour(), dt.minute(), dt.second()}),
+                
+                ';' => try writer.writeByte(':'),
                 else => @compileError("Invalid date format specifier " ++ fc),
             }
             next_char_is_specifier = false;
