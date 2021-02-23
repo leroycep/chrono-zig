@@ -27,9 +27,9 @@ pub const NaiveDate = struct {
         }
     }
 
-    pub fn ymd(year_param: i32, month: MonthInt, day: DayInt) ?@This() {
+    pub fn ymd(year_param: i32, month_param: MonthInt, day_param: DayInt) ?@This() {
         const flags = internals.YearFlags.from_year(year_param);
-        const mdf = internals.Mdf.new(month, day, flags);
+        const mdf = internals.Mdf.new(month_param, day_param, flags);
         const of = mdf.to_of();
         return from_of(year_param, of);
     }
@@ -89,6 +89,14 @@ pub const NaiveDate = struct {
 
     pub fn year(this: @This()) YearInt {
         return this._year;
+    }
+    
+    pub fn month(this: @This()) MonthInt {
+        return this._of.to_mdf().month;
+    }
+    
+    pub fn day(this: @This()) internals.DayInt {
+        return this._of.to_mdf().day;
     }
 
     pub fn signed_duration_since(this: @This(), other: @This()) i64 {

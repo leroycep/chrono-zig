@@ -1,8 +1,11 @@
 const std = @import("std");
 const NaiveDate = @import("./date.zig").NaiveDate;
-const NaiveTime = @import("./time.zig").NaiveTime;
+const time_module = @import("./time.zig");
+const NaiveTime = time_module.NaiveTime;
 const timezone = @import("./timezone.zig");
 const TimeZone = timezone.TimeZone;
+const internals = @import("./internals.zig");
+const format_module = @import("./format.zig");
 
 const DAYS_AFTER_ZERO_EPOCH = 719163;
 const EPOCH = NaiveDate.ymd(1970, 01, 01).?.hms(0, 0, 0).?;
@@ -64,6 +67,55 @@ pub const NaiveDateTime = struct {
     pub fn signed_duration_since(this: @This(), other: @This()) i64 {
         return this.date.signed_duration_since(other.date) + this.time.signed_duration_since(other.time);
     }
+
+    pub fn year(this: @This()) internals.YearInt {
+        return this.date.year();
+    }
+
+    pub fn month(this: @This()) internals.MonthInt {
+        return this.date.month();
+    }
+
+    pub fn day(this: @This()) internals.DayInt {
+        return this.date.day();
+    }
+
+    pub fn hour(this: @This()) time_module.HoursInt {
+        return this.time.hour();
+    }
+
+    pub fn minute(this: @This()) time_module.MinutesInt {
+        return this.time.minute();
+    }
+
+    pub fn second(this: @This()) time_module.SecondsInt {
+        return this.time.second();
+    }
+
+    pub fn Formatted(comptime format_str: []const u8) type {
+        return struct {
+            dt: NaiveDateTime,
+
+            pub fn format(
+                this: @This(),
+                comptime fmt: []const u8,
+                options: std.fmt.FormatOptions,
+                writer: anytype,
+            ) !void {
+                if (fmt.len == 0) {
+                    return format_module.formatNaiveDateTime(writer, format_str, this.dt);
+                } else {
+                    @compileError("Unknown format character: '" ++ fmt ++ "'");
+                }
+            }
+        };
+    }
+
+    pub fn formatted(this: @This(), comptime format_str: []const u8) Formatted(format_str) {
+        return Formatted(format_str){
+            .dt = this,
+        };
+    }
 };
 
 test "naive datetime from timestamp" {
@@ -96,4 +148,13 @@ test "Pacific/Honolulu datetime from timestamp" {
         const dt = NaiveDateTime.from_timestamp(case.timestamp, 0).?.with_timezone(&honolulu);
         std.testing.expectEqual(case.local_time, dt.toNaiveDateTime());
     }
+}
+
+test "naive datetime .formatted()" {
+    var str = std.ArrayList(u8).init(std.testing.allocator);
+    defer str.deinit();
+
+    try str.writer().print("{}", .{NaiveDate.ymd(2021, 02, 18).?.hms(17, 00, 00).?.formatted("%Y-%m-%d %H:%M:%S")});
+
+    std.testing.expectEqualSlices(u8, "2021-02-18 17:00:00", str.items);
 }
