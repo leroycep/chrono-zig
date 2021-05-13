@@ -145,27 +145,27 @@ pub const NaiveTime = struct {
 };
 
 test "time hour, minute, second" {
-    std.testing.expectEqual(@as(HoursInt, 3), NaiveTime.hms(3, 5, 7).?.hour());
-    std.testing.expectEqual(NaiveTime.hms(0, 5, 7), NaiveTime.hms(3, 5, 7).?.with_hour(0));
-    std.testing.expectEqual(NaiveTime.hms(23, 5, 7), NaiveTime.hms(3, 5, 7).?.with_hour(23));
-    std.testing.expectEqual(@as(?NaiveTime, null), NaiveTime.hms(3, 5, 7).?.with_hour(24));
-    std.testing.expectEqual(@as(?NaiveTime, null), NaiveTime.hms(3, 5, 7).?.with_hour(std.math.maxInt(HoursInt)));
+    try std.testing.expectEqual(@as(HoursInt, 3), NaiveTime.hms(3, 5, 7).?.hour());
+    try std.testing.expectEqual(NaiveTime.hms(0, 5, 7), NaiveTime.hms(3, 5, 7).?.with_hour(0));
+    try std.testing.expectEqual(NaiveTime.hms(23, 5, 7), NaiveTime.hms(3, 5, 7).?.with_hour(23));
+    try std.testing.expectEqual(@as(?NaiveTime, null), NaiveTime.hms(3, 5, 7).?.with_hour(24));
+    try std.testing.expectEqual(@as(?NaiveTime, null), NaiveTime.hms(3, 5, 7).?.with_hour(std.math.maxInt(HoursInt)));
 
-    std.testing.expectEqual(@as(MinutesInt, 5), NaiveTime.hms(3, 5, 7).?.minute());
-    std.testing.expectEqual(NaiveTime.hms(3, 0, 7), NaiveTime.hms(3, 5, 7).?.with_minute(0));
-    std.testing.expectEqual(NaiveTime.hms(3, 59, 7), NaiveTime.hms(3, 5, 7).?.with_minute(59));
-    std.testing.expectEqual(@as(?NaiveTime, null), NaiveTime.hms(3, 5, 7).?.with_minute(60));
-    std.testing.expectEqual(@as(?NaiveTime, null), NaiveTime.hms(3, 5, 7).?.with_minute(std.math.maxInt(MinutesInt)));
+    try std.testing.expectEqual(@as(MinutesInt, 5), NaiveTime.hms(3, 5, 7).?.minute());
+    try std.testing.expectEqual(NaiveTime.hms(3, 0, 7), NaiveTime.hms(3, 5, 7).?.with_minute(0));
+    try std.testing.expectEqual(NaiveTime.hms(3, 59, 7), NaiveTime.hms(3, 5, 7).?.with_minute(59));
+    try std.testing.expectEqual(@as(?NaiveTime, null), NaiveTime.hms(3, 5, 7).?.with_minute(60));
+    try std.testing.expectEqual(@as(?NaiveTime, null), NaiveTime.hms(3, 5, 7).?.with_minute(std.math.maxInt(MinutesInt)));
 
-    std.testing.expectEqual(@as(MinutesInt, 7), NaiveTime.hms(3, 5, 7).?.second());
-    std.testing.expectEqual(NaiveTime.hms(3, 5, 0), NaiveTime.hms(3, 5, 7).?.with_second(0));
-    std.testing.expectEqual(NaiveTime.hms(3, 5, 59), NaiveTime.hms(3, 5, 7).?.with_second(59));
-    std.testing.expectEqual(@as(?NaiveTime, null), NaiveTime.hms(3, 5, 7).?.with_second(60));
-    std.testing.expectEqual(@as(?NaiveTime, null), NaiveTime.hms(3, 5, 7).?.with_second(std.math.maxInt(MinutesInt)));
+    try std.testing.expectEqual(@as(MinutesInt, 7), NaiveTime.hms(3, 5, 7).?.second());
+    try std.testing.expectEqual(NaiveTime.hms(3, 5, 0), NaiveTime.hms(3, 5, 7).?.with_second(0));
+    try std.testing.expectEqual(NaiveTime.hms(3, 5, 59), NaiveTime.hms(3, 5, 7).?.with_second(59));
+    try std.testing.expectEqual(@as(?NaiveTime, null), NaiveTime.hms(3, 5, 7).?.with_second(60));
+    try std.testing.expectEqual(@as(?NaiveTime, null), NaiveTime.hms(3, 5, 7).?.with_second(std.math.maxInt(MinutesInt)));
 }
 
 test "time signed duration since" {
     const hms = NaiveTime.hms;
-    std.testing.expectEqual(@as(i64, 3600), hms(23, 0, 0).?.signed_duration_since(hms(22, 0, 0).?));
-    std.testing.expectEqual(@as(i64, 79_200), hms(22, 0, 0).?.signed_duration_since(hms(0, 0, 0).?));
+    try std.testing.expectEqual(@as(i64, 3600), hms(23, 0, 0).?.signed_duration_since(hms(22, 0, 0).?));
+    try std.testing.expectEqual(@as(i64, 79_200), hms(22, 0, 0).?.signed_duration_since(hms(0, 0, 0).?));
 }

@@ -119,15 +119,15 @@ pub const MIN_DATE = NaiveDate{ .ymdf = (MIN_YEAR << 13) | (1 << 4) | internals.
 test "date from ymd" {
     const ymd = NaiveDate.ymd;
 
-    std.testing.expectEqual(@as(?NaiveDate, null), ymd(2012, 0, 1));
-    std.testing.expect(!std.meta.eql(@as(?NaiveDate, null), ymd(2012, 1, 1)));
-    std.testing.expect(!std.meta.eql(@as(?NaiveDate, null), ymd(2012, 2, 29)));
-    std.testing.expectEqual(@as(?NaiveDate, null), ymd(2014, 2, 29));
-    std.testing.expectEqual(@as(?NaiveDate, null), ymd(2014, 3, 0));
-    std.testing.expect(!std.meta.eql(@as(?NaiveDate, null), ymd(2014, 3, 1)));
-    std.testing.expect(!std.meta.eql(@as(?NaiveDate, null), ymd(2014, 3, 31)));
-    std.testing.expect(!std.meta.eql(@as(?NaiveDate, null), ymd(2014, 12, 31)));
-    std.testing.expectEqual(@as(?NaiveDate, null), ymd(2014, 13, 1));
+    try std.testing.expectEqual(@as(?NaiveDate, null), ymd(2012, 0, 1));
+    try std.testing.expect(!std.meta.eql(@as(?NaiveDate, null), ymd(2012, 1, 1)));
+    try std.testing.expect(!std.meta.eql(@as(?NaiveDate, null), ymd(2012, 2, 29)));
+    try std.testing.expectEqual(@as(?NaiveDate, null), ymd(2014, 2, 29));
+    try std.testing.expectEqual(@as(?NaiveDate, null), ymd(2014, 3, 0));
+    try std.testing.expect(!std.meta.eql(@as(?NaiveDate, null), ymd(2014, 3, 1)));
+    try std.testing.expect(!std.meta.eql(@as(?NaiveDate, null), ymd(2014, 3, 31)));
+    try std.testing.expect(!std.meta.eql(@as(?NaiveDate, null), ymd(2014, 12, 31)));
+    try std.testing.expectEqual(@as(?NaiveDate, null), ymd(2014, 13, 1));
 }
 
 test "date from year-ordinal" {
@@ -135,51 +135,51 @@ test "date from year-ordinal" {
     const ymd = NaiveDate.ymd;
     const null_date = @as(?NaiveDate, null);
 
-    std.testing.expectEqual(null_date, yo(2012, 0));
-    std.testing.expectEqual(ymd(2012, 1, 1).?, yo(2012, 1).?);
-    std.testing.expectEqual(ymd(2012, 1, 2).?, yo(2012, 2).?);
-    std.testing.expectEqual(ymd(2012, 2, 1).?, yo(2012, 32).?);
-    std.testing.expectEqual(ymd(2012, 2, 29).?, yo(2012, 60).?);
-    std.testing.expectEqual(ymd(2012, 3, 1).?, yo(2012, 61).?);
-    std.testing.expectEqual(ymd(2012, 4, 9).?, yo(2012, 100).?);
-    std.testing.expectEqual(ymd(2012, 7, 18).?, yo(2012, 200).?);
-    std.testing.expectEqual(ymd(2012, 10, 26).?, yo(2012, 300).?);
-    std.testing.expectEqual(ymd(2012, 12, 31).?, yo(2012, 366).?);
-    std.testing.expectEqual(null_date, yo(2012, 367));
+    try std.testing.expectEqual(null_date, yo(2012, 0));
+    try std.testing.expectEqual(ymd(2012, 1, 1).?, yo(2012, 1).?);
+    try std.testing.expectEqual(ymd(2012, 1, 2).?, yo(2012, 2).?);
+    try std.testing.expectEqual(ymd(2012, 2, 1).?, yo(2012, 32).?);
+    try std.testing.expectEqual(ymd(2012, 2, 29).?, yo(2012, 60).?);
+    try std.testing.expectEqual(ymd(2012, 3, 1).?, yo(2012, 61).?);
+    try std.testing.expectEqual(ymd(2012, 4, 9).?, yo(2012, 100).?);
+    try std.testing.expectEqual(ymd(2012, 7, 18).?, yo(2012, 200).?);
+    try std.testing.expectEqual(ymd(2012, 10, 26).?, yo(2012, 300).?);
+    try std.testing.expectEqual(ymd(2012, 12, 31).?, yo(2012, 366).?);
+    try std.testing.expectEqual(null_date, yo(2012, 367));
 
-    std.testing.expectEqual(null_date, yo(2014, 0));
-    std.testing.expectEqual(ymd(2014, 1, 1).?, yo(2014, 1).?);
-    std.testing.expectEqual(ymd(2014, 1, 2).?, yo(2014, 2).?);
-    std.testing.expectEqual(ymd(2014, 2, 1).?, yo(2014, 32).?);
-    std.testing.expectEqual(ymd(2014, 2, 28).?, yo(2014, 59).?);
-    std.testing.expectEqual(ymd(2014, 3, 1).?, yo(2014, 60).?);
-    std.testing.expectEqual(ymd(2014, 4, 10).?, yo(2014, 100).?);
-    std.testing.expectEqual(ymd(2014, 7, 19).?, yo(2014, 200).?);
-    std.testing.expectEqual(ymd(2014, 10, 27).?, yo(2014, 300).?);
-    std.testing.expectEqual(ymd(2014, 12, 31).?, yo(2014, 365).?);
-    std.testing.expectEqual(null_date, yo(2014, 366));
+    try std.testing.expectEqual(null_date, yo(2014, 0));
+    try std.testing.expectEqual(ymd(2014, 1, 1).?, yo(2014, 1).?);
+    try std.testing.expectEqual(ymd(2014, 1, 2).?, yo(2014, 2).?);
+    try std.testing.expectEqual(ymd(2014, 2, 1).?, yo(2014, 32).?);
+    try std.testing.expectEqual(ymd(2014, 2, 28).?, yo(2014, 59).?);
+    try std.testing.expectEqual(ymd(2014, 3, 1).?, yo(2014, 60).?);
+    try std.testing.expectEqual(ymd(2014, 4, 10).?, yo(2014, 100).?);
+    try std.testing.expectEqual(ymd(2014, 7, 19).?, yo(2014, 200).?);
+    try std.testing.expectEqual(ymd(2014, 10, 27).?, yo(2014, 300).?);
+    try std.testing.expectEqual(ymd(2014, 12, 31).?, yo(2014, 365).?);
+    try std.testing.expectEqual(null_date, yo(2014, 366));
 }
 
 test "date successor" {
     const ymd = NaiveDate.ymd;
-    std.testing.expectEqual(ymd(2014, 5, 7).?, ymd(2014, 5, 6).?.succ().?);
-    std.testing.expectEqual(ymd(2014, 6, 1).?, ymd(2014, 5, 31).?.succ().?);
-    std.testing.expectEqual(ymd(2015, 1, 1).?, ymd(2014, 12, 31).?.succ().?);
-    std.testing.expectEqual(ymd(2016, 2, 29).?, ymd(2016, 2, 28).?.succ().?);
-    std.testing.expectEqual(@as(?NaiveDate, null), ymd(MAX_YEAR, 12, 31).?.succ());
+    try std.testing.expectEqual(ymd(2014, 5, 7).?, ymd(2014, 5, 6).?.succ().?);
+    try std.testing.expectEqual(ymd(2014, 6, 1).?, ymd(2014, 5, 31).?.succ().?);
+    try std.testing.expectEqual(ymd(2015, 1, 1).?, ymd(2014, 12, 31).?.succ().?);
+    try std.testing.expectEqual(ymd(2016, 2, 29).?, ymd(2016, 2, 28).?.succ().?);
+    try std.testing.expectEqual(@as(?NaiveDate, null), ymd(MAX_YEAR, 12, 31).?.succ());
 }
 
 test "date predecessor" {
     const ymd = NaiveDate.ymd;
-    std.testing.expectEqual(ymd(2016, 2, 29).?, ymd(2016, 3, 1).?.pred().?);
-    std.testing.expectEqual(ymd(2014, 12, 31).?, ymd(2015, 1, 1).?.pred().?);
-    std.testing.expectEqual(ymd(2014, 5, 31).?, ymd(2014, 6, 1).?.pred().?);
-    std.testing.expectEqual(ymd(2014, 5, 6).?, ymd(2014, 5, 7).?.pred().?);
-    std.testing.expectEqual(@as(?NaiveDate, null), ymd(MIN_YEAR, 1, 1).?.pred());
+    try std.testing.expectEqual(ymd(2016, 2, 29).?, ymd(2016, 3, 1).?.pred().?);
+    try std.testing.expectEqual(ymd(2014, 12, 31).?, ymd(2015, 1, 1).?.pred().?);
+    try std.testing.expectEqual(ymd(2014, 5, 31).?, ymd(2014, 6, 1).?.pred().?);
+    try std.testing.expectEqual(ymd(2014, 5, 6).?, ymd(2014, 5, 7).?.pred().?);
+    try std.testing.expectEqual(@as(?NaiveDate, null), ymd(MIN_YEAR, 1, 1).?.pred());
 }
 
 test "date signed duration since" {
     const ymd = NaiveDate.ymd;
-    std.testing.expectEqual(@as(i64, 86400), ymd(2016, 3, 1).?.signed_duration_since(ymd(2016, 2, 29).?));
-    std.testing.expectEqual(@as(i64, 1613952000), ymd(2021, 2, 22).?.signed_duration_since(ymd(1970, 1, 1).?));
+    try std.testing.expectEqual(@as(i64, 86400), ymd(2016, 3, 1).?.signed_duration_since(ymd(2016, 2, 29).?));
+    try std.testing.expectEqual(@as(i64, 1613952000), ymd(2021, 2, 22).?.signed_duration_since(ymd(1970, 1, 1).?));
 }

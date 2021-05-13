@@ -98,7 +98,7 @@ pub const TimeZone = struct {
             return null;
         }
     }
-    
+
     pub fn localTimeToUTC(this: @This(), localtime: i64) ?ConversionResult {
         @compileError("Unimplemented");
     }
@@ -341,7 +341,7 @@ pub fn parseFile(allocator: *std.mem.Allocator, path: []const u8) !TimeZone {
 
 test "parse invalid bytes" {
     var fbs = std.io.fixedBufferStream("dflkasjreklnlkvnalkfek");
-    testing.expectError(error.InvalidFormat, parse(std.testing.allocator, fbs.reader(), fbs.seekableStream()));
+    try testing.expectError(error.InvalidFormat, parse(std.testing.allocator, fbs.reader(), fbs.seekableStream()));
 }
 
 test "parse UTC zoneinfo" {
@@ -350,11 +350,11 @@ test "parse UTC zoneinfo" {
     const res = try parse(std.testing.allocator, fbs.reader(), fbs.seekableStream());
     defer res.deinit();
 
-    testing.expectEqual(Version.V2, res.version);
-    testing.expectEqualSlices(i64, &[_]i64{}, res.transitionTimes);
-    testing.expectEqualSlices(u8, &[_]u8{}, res.transitionTypes);
-    testing.expectEqualSlices(LocalTimeType, &[_]LocalTimeType{.{ .utoff = 0, .dst = false, .idx = 0 }}, res.localTimeTypes);
-    testing.expectEqualSlices(u8, "UTC\x00", res.designations);
+    try testing.expectEqual(Version.V2, res.version);
+    try testing.expectEqualSlices(i64, &[_]i64{}, res.transitionTimes);
+    try testing.expectEqualSlices(u8, &[_]u8{}, res.transitionTypes);
+    try testing.expectEqualSlices(LocalTimeType, &[_]LocalTimeType{.{ .utoff = 0, .dst = false, .idx = 0 }}, res.localTimeTypes);
+    try testing.expectEqualSlices(u8, "UTC\x00", res.designations);
 }
 
 test "parse Pacific/Honolulu zoneinfo and calculate local times" {
@@ -378,25 +378,25 @@ test "parse Pacific/Honolulu zoneinfo and calculate local times" {
     const res = try parse(std.testing.allocator, fbs.reader(), fbs.seekableStream());
     defer res.deinit();
 
-    testing.expectEqual(Version.V2, res.version);
-    testing.expectEqualSlices(i64, &transition_times, res.transitionTimes);
-    testing.expectEqualSlices(u8, &transition_types, res.transitionTypes);
-    testing.expectEqualSlices(LocalTimeType, &local_time_types, res.localTimeTypes);
-    testing.expectEqualSlices(u8, designations, res.designations);
-    testing.expectEqualSlices(bool, is_std, res.transitionIsStd);
-    testing.expectEqualSlices(bool, is_ut, res.transitionIsUT);
-    testing.expectEqualSlices(u8, string, res.string);
+    try testing.expectEqual(Version.V2, res.version);
+    try testing.expectEqualSlices(i64, &transition_times, res.transitionTimes);
+    try testing.expectEqualSlices(u8, &transition_types, res.transitionTypes);
+    try testing.expectEqualSlices(LocalTimeType, &local_time_types, res.localTimeTypes);
+    try testing.expectEqualSlices(u8, designations, res.designations);
+    try testing.expectEqualSlices(bool, is_std, res.transitionIsStd);
+    try testing.expectEqualSlices(bool, is_ut, res.transitionIsUT);
+    try testing.expectEqualSlices(u8, string, res.string);
 
     {
         const conversion = res.localTimeFromUTC(-1156939200).?;
-        testing.expectEqual(@as(i64, -1156973400), conversion.timestamp);
-        testing.expectEqual(true, conversion.dst);
-        testing.expectEqualSlices(u8, "HDT", conversion.designation);
+        try testing.expectEqual(@as(i64, -1156973400), conversion.timestamp);
+        try testing.expectEqual(true, conversion.dst);
+        try testing.expectEqualSlices(u8, "HDT", conversion.designation);
     }
     {
         const conversion = res.localTimeFromUTC(1546300800).?;
-        testing.expectEqual(@as(i64, 1546300800) - 10 * std.time.s_per_hour, conversion.timestamp);
-        testing.expectEqual(false, conversion.dst);
-        testing.expectEqualSlices(u8, "HST", conversion.designation);
+        try testing.expectEqual(@as(i64, 1546300800) - 10 * std.time.s_per_hour, conversion.timestamp);
+        try testing.expectEqual(false, conversion.dst);
+        try testing.expectEqualSlices(u8, "HST", conversion.designation);
     }
 }

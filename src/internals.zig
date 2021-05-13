@@ -167,52 +167,52 @@ pub const YearFlags = packed struct {
 };
 
 test "year flags number of days from year" {
-    expectEqual(@as(u32, 365), YearFlags.from_year(2014).ndays());
-    expectEqual(@as(u32, 366), YearFlags.from_year(2012).ndays());
-    expectEqual(@as(u32, 366), YearFlags.from_year(2000).ndays());
-    expectEqual(@as(u32, 365), YearFlags.from_year(1900).ndays());
-    expectEqual(@as(u32, 366), YearFlags.from_year(1600).ndays());
-    expectEqual(@as(u32, 365), YearFlags.from_year(1).ndays());
-    expectEqual(@as(u32, 366), YearFlags.from_year(0).ndays()); // 1 BCE (proleptic Gregorian)
-    expectEqual(@as(u32, 365), YearFlags.from_year(-1).ndays()); // 2 BCE
-    expectEqual(@as(u32, 366), YearFlags.from_year(-4).ndays()); // 5 BCE
-    expectEqual(@as(u32, 365), YearFlags.from_year(-99).ndays()); // 100 BCE
-    expectEqual(@as(u32, 365), YearFlags.from_year(-100).ndays()); // 101 BCE
-    expectEqual(@as(u32, 365), YearFlags.from_year(-399).ndays()); // 400 BCE
-    expectEqual(@as(u32, 366), YearFlags.from_year(-400).ndays()); // 401 BCE
+    try expectEqual(@as(u32, 365), YearFlags.from_year(2014).ndays());
+    try expectEqual(@as(u32, 366), YearFlags.from_year(2012).ndays());
+    try expectEqual(@as(u32, 366), YearFlags.from_year(2000).ndays());
+    try expectEqual(@as(u32, 365), YearFlags.from_year(1900).ndays());
+    try expectEqual(@as(u32, 366), YearFlags.from_year(1600).ndays());
+    try expectEqual(@as(u32, 365), YearFlags.from_year(1).ndays());
+    try expectEqual(@as(u32, 366), YearFlags.from_year(0).ndays()); // 1 BCE (proleptic Gregorian)
+    try expectEqual(@as(u32, 365), YearFlags.from_year(-1).ndays()); // 2 BCE
+    try expectEqual(@as(u32, 366), YearFlags.from_year(-4).ndays()); // 5 BCE
+    try expectEqual(@as(u32, 365), YearFlags.from_year(-99).ndays()); // 100 BCE
+    try expectEqual(@as(u32, 365), YearFlags.from_year(-100).ndays()); // 101 BCE
+    try expectEqual(@as(u32, 365), YearFlags.from_year(-399).ndays()); // 400 BCE
+    try expectEqual(@as(u32, 366), YearFlags.from_year(-400).ndays()); // 401 BCE
 }
 
 test "year flags is leap year from year" {
-    std.testing.expect(!YearFlags.from_year(2014).isleapyear());
-    std.testing.expect(YearFlags.from_year(2012).isleapyear());
-    std.testing.expect(YearFlags.from_year(2000).isleapyear());
-    std.testing.expect(!YearFlags.from_year(1900).isleapyear());
-    std.testing.expect(YearFlags.from_year(1600).isleapyear());
-    std.testing.expect(!YearFlags.from_year(1).isleapyear());
-    std.testing.expect(YearFlags.from_year(0).isleapyear()); // 1 BCE (proleptic Gregorian)
-    std.testing.expect(!YearFlags.from_year(-1).isleapyear()); // 2 BCE
-    std.testing.expect(YearFlags.from_year(-4).isleapyear()); // 5 BCE
-    std.testing.expect(!YearFlags.from_year(-99).isleapyear()); // 100 BCE
-    std.testing.expect(!YearFlags.from_year(-100).isleapyear()); // 101 BCE
-    std.testing.expect(!YearFlags.from_year(-399).isleapyear()); // 400 BCE
-    std.testing.expect(YearFlags.from_year(-400).isleapyear()); // 401 BCE
+    try std.testing.expect(!YearFlags.from_year(2014).isleapyear());
+    try std.testing.expect(YearFlags.from_year(2012).isleapyear());
+    try std.testing.expect(YearFlags.from_year(2000).isleapyear());
+    try std.testing.expect(!YearFlags.from_year(1900).isleapyear());
+    try std.testing.expect(YearFlags.from_year(1600).isleapyear());
+    try std.testing.expect(!YearFlags.from_year(1).isleapyear());
+    try std.testing.expect(YearFlags.from_year(0).isleapyear()); // 1 BCE (proleptic Gregorian)
+    try std.testing.expect(!YearFlags.from_year(-1).isleapyear()); // 2 BCE
+    try std.testing.expect(YearFlags.from_year(-4).isleapyear()); // 5 BCE
+    try std.testing.expect(!YearFlags.from_year(-99).isleapyear()); // 100 BCE
+    try std.testing.expect(!YearFlags.from_year(-100).isleapyear()); // 101 BCE
+    try std.testing.expect(!YearFlags.from_year(-399).isleapyear()); // 400 BCE
+    try std.testing.expect(YearFlags.from_year(-400).isleapyear()); // 401 BCE
 }
 
 test "year flags number of iso weeks" {
-    expectEqual(@as(u32, 52), A.nisoweeks());
-    expectEqual(@as(u32, 52), B.nisoweeks());
-    expectEqual(@as(u32, 52), C.nisoweeks());
-    expectEqual(@as(u32, 53), D.nisoweeks());
-    expectEqual(@as(u32, 52), E.nisoweeks());
-    expectEqual(@as(u32, 52), F.nisoweeks());
-    expectEqual(@as(u32, 52), G.nisoweeks());
-    expectEqual(@as(u32, 52), AG.nisoweeks());
-    expectEqual(@as(u32, 52), BA.nisoweeks());
-    expectEqual(@as(u32, 52), CB.nisoweeks());
-    expectEqual(@as(u32, 53), DC.nisoweeks());
-    expectEqual(@as(u32, 53), ED.nisoweeks());
-    expectEqual(@as(u32, 52), FE.nisoweeks());
-    expectEqual(@as(u32, 52), GF.nisoweeks());
+    try expectEqual(@as(u32, 52), A.nisoweeks());
+    try expectEqual(@as(u32, 52), B.nisoweeks());
+    try expectEqual(@as(u32, 52), C.nisoweeks());
+    try expectEqual(@as(u32, 53), D.nisoweeks());
+    try expectEqual(@as(u32, 52), E.nisoweeks());
+    try expectEqual(@as(u32, 52), F.nisoweeks());
+    try expectEqual(@as(u32, 52), G.nisoweeks());
+    try expectEqual(@as(u32, 52), AG.nisoweeks());
+    try expectEqual(@as(u32, 52), BA.nisoweeks());
+    try expectEqual(@as(u32, 52), CB.nisoweeks());
+    try expectEqual(@as(u32, 53), DC.nisoweeks());
+    try expectEqual(@as(u32, 53), ED.nisoweeks());
+    try expectEqual(@as(u32, 52), FE.nisoweeks());
+    try expectEqual(@as(u32, 52), GF.nisoweeks());
 }
 
 pub const MIN_OL: u32 = 1 << 1;
@@ -435,11 +435,11 @@ const NONLEAP_FLAGS = [7]YearFlags{ A, B, C, D, E, F, G };
 const LEAP_FLAGS = [7]YearFlags{ AG, BA, CB, DC, ED, FE, GF };
 const FLAGS = NONLEAP_FLAGS ++ LEAP_FLAGS;
 
-fn of_check(expected: bool, flags: YearFlags, ordinal1: u32, ordinal2: u32) void {
+fn of_check(expected: bool, flags: YearFlags, ordinal1: u32, ordinal2: u32) !void {
     var ordinal = ordinal1;
     while (ordinal <= ordinal2) : (ordinal += 1) {
         const of = Of.new(ordinal, flags);
-        expectEqual(expected, of.valid());
+        try expectEqual(expected, of.valid());
 
         if (ordinal == ordinal2) break;
     }
@@ -447,17 +447,17 @@ fn of_check(expected: bool, flags: YearFlags, ordinal1: u32, ordinal2: u32) void
 
 test "ordinal + year flags" {
     for (NONLEAP_FLAGS) |flags| {
-        of_check(false, flags, 0, 0);
-        of_check(true, flags, 1, 365);
-        of_check(false, flags, 366, 1024);
-        of_check(false, flags, std.math.maxInt(u32), std.math.maxInt(u32));
+        try of_check(false, flags, 0, 0);
+        try of_check(true, flags, 1, 365);
+        try of_check(false, flags, 366, 1024);
+        try of_check(false, flags, std.math.maxInt(u32), std.math.maxInt(u32));
     }
 
     for (LEAP_FLAGS) |flags| {
-        of_check(false, flags, 0, 0);
-        of_check(true, flags, 1, 366);
-        of_check(false, flags, 367, 1024);
-        of_check(false, flags, std.math.maxInt(u32), std.math.maxInt(u32));
+        try of_check(false, flags, 0, 0);
+        try of_check(true, flags, 1, 366);
+        try of_check(false, flags, 367, 1024);
+        try of_check(false, flags, std.math.maxInt(u32), std.math.maxInt(u32));
     }
 }
 
@@ -525,13 +525,13 @@ pub const Mdf = struct {
     }
 };
 
-fn mdf_check(expected: bool, flags: YearFlags, month1: u32, day1: u32, month2: u32, day2: u32) void {
+fn mdf_check(expected: bool, flags: YearFlags, month1: u32, day1: u32, month2: u32, day2: u32) !void {
     var month = month1;
     while (month <= month2) : (month += 1) {
         var day = day1;
         while (day <= day2) : (day += 1) {
             const mdf = Mdf.new(month, day, flags);
-            expectEqual(expected, mdf.valid());
+            try expectEqual(expected, mdf.valid());
 
             if (day == day2) break;
         }
@@ -542,69 +542,69 @@ fn mdf_check(expected: bool, flags: YearFlags, month1: u32, day1: u32, month2: u
 
 test "month and day + year flags" {
     for (NONLEAP_FLAGS) |flags| {
-        mdf_check(false, flags, 0, 0, 0, 1024);
-        mdf_check(false, flags, 0, 0, 16, 0);
-        mdf_check(true, flags, 1, 1, 1, 31);
-        mdf_check(false, flags, 1, 32, 1, 1024);
-        mdf_check(true, flags, 2, 1, 2, 28);
-        mdf_check(false, flags, 2, 29, 2, 1024);
-        mdf_check(true, flags, 3, 1, 3, 31);
-        mdf_check(false, flags, 3, 32, 3, 1024);
-        mdf_check(true, flags, 4, 1, 4, 30);
-        mdf_check(false, flags, 4, 31, 4, 1024);
-        mdf_check(true, flags, 5, 1, 5, 31);
-        mdf_check(false, flags, 5, 32, 5, 1024);
-        mdf_check(true, flags, 6, 1, 6, 30);
-        mdf_check(false, flags, 6, 31, 6, 1024);
-        mdf_check(true, flags, 7, 1, 7, 31);
-        mdf_check(false, flags, 7, 32, 7, 1024);
-        mdf_check(true, flags, 8, 1, 8, 31);
-        mdf_check(false, flags, 8, 32, 8, 1024);
-        mdf_check(true, flags, 9, 1, 9, 30);
-        mdf_check(false, flags, 9, 31, 9, 1024);
-        mdf_check(true, flags, 10, 1, 10, 31);
-        mdf_check(false, flags, 10, 32, 10, 1024);
-        mdf_check(true, flags, 11, 1, 11, 30);
-        mdf_check(false, flags, 11, 31, 11, 1024);
-        mdf_check(true, flags, 12, 1, 12, 31);
-        mdf_check(false, flags, 12, 32, 12, 1024);
-        mdf_check(false, flags, 13, 0, 16, 1024);
-        mdf_check(false, flags, std.math.maxInt(u32), 0, std.math.maxInt(u32), 1024);
-        mdf_check(false, flags, 0, std.math.maxInt(u32), 16, std.math.maxInt(u32));
-        mdf_check(false, flags, std.math.maxInt(u32), std.math.maxInt(u32), std.math.maxInt(u32), std.math.maxInt(u32));
+        try mdf_check(false, flags, 0, 0, 0, 1024);
+        try mdf_check(false, flags, 0, 0, 16, 0);
+        try mdf_check(true, flags, 1, 1, 1, 31);
+        try mdf_check(false, flags, 1, 32, 1, 1024);
+        try mdf_check(true, flags, 2, 1, 2, 28);
+        try mdf_check(false, flags, 2, 29, 2, 1024);
+        try mdf_check(true, flags, 3, 1, 3, 31);
+        try mdf_check(false, flags, 3, 32, 3, 1024);
+        try mdf_check(true, flags, 4, 1, 4, 30);
+        try mdf_check(false, flags, 4, 31, 4, 1024);
+        try mdf_check(true, flags, 5, 1, 5, 31);
+        try mdf_check(false, flags, 5, 32, 5, 1024);
+        try mdf_check(true, flags, 6, 1, 6, 30);
+        try mdf_check(false, flags, 6, 31, 6, 1024);
+        try mdf_check(true, flags, 7, 1, 7, 31);
+        try mdf_check(false, flags, 7, 32, 7, 1024);
+        try mdf_check(true, flags, 8, 1, 8, 31);
+        try mdf_check(false, flags, 8, 32, 8, 1024);
+        try mdf_check(true, flags, 9, 1, 9, 30);
+        try mdf_check(false, flags, 9, 31, 9, 1024);
+        try mdf_check(true, flags, 10, 1, 10, 31);
+        try mdf_check(false, flags, 10, 32, 10, 1024);
+        try mdf_check(true, flags, 11, 1, 11, 30);
+        try mdf_check(false, flags, 11, 31, 11, 1024);
+        try mdf_check(true, flags, 12, 1, 12, 31);
+        try mdf_check(false, flags, 12, 32, 12, 1024);
+        try mdf_check(false, flags, 13, 0, 16, 1024);
+        try mdf_check(false, flags, std.math.maxInt(u32), 0, std.math.maxInt(u32), 1024);
+        try mdf_check(false, flags, 0, std.math.maxInt(u32), 16, std.math.maxInt(u32));
+        try mdf_check(false, flags, std.math.maxInt(u32), std.math.maxInt(u32), std.math.maxInt(u32), std.math.maxInt(u32));
     }
 
     for (LEAP_FLAGS) |flags| {
-        mdf_check(false, flags, 0, 0, 0, 1024);
-        mdf_check(false, flags, 0, 0, 16, 0);
-        mdf_check(true, flags, 1, 1, 1, 31);
-        mdf_check(false, flags, 1, 32, 1, 1024);
-        mdf_check(true, flags, 2, 1, 2, 29);
-        mdf_check(false, flags, 2, 30, 2, 1024);
-        mdf_check(true, flags, 3, 1, 3, 31);
-        mdf_check(false, flags, 3, 32, 3, 1024);
-        mdf_check(true, flags, 4, 1, 4, 30);
-        mdf_check(false, flags, 4, 31, 4, 1024);
-        mdf_check(true, flags, 5, 1, 5, 31);
-        mdf_check(false, flags, 5, 32, 5, 1024);
-        mdf_check(true, flags, 6, 1, 6, 30);
-        mdf_check(false, flags, 6, 31, 6, 1024);
-        mdf_check(true, flags, 7, 1, 7, 31);
-        mdf_check(false, flags, 7, 32, 7, 1024);
-        mdf_check(true, flags, 8, 1, 8, 31);
-        mdf_check(false, flags, 8, 32, 8, 1024);
-        mdf_check(true, flags, 9, 1, 9, 30);
-        mdf_check(false, flags, 9, 31, 9, 1024);
-        mdf_check(true, flags, 10, 1, 10, 31);
-        mdf_check(false, flags, 10, 32, 10, 1024);
-        mdf_check(true, flags, 11, 1, 11, 30);
-        mdf_check(false, flags, 11, 31, 11, 1024);
-        mdf_check(true, flags, 12, 1, 12, 31);
-        mdf_check(false, flags, 12, 32, 12, 1024);
-        mdf_check(false, flags, 13, 0, 16, 1024);
-        mdf_check(false, flags, std.math.maxInt(u32), 0, std.math.maxInt(u32), 1024);
-        mdf_check(false, flags, 0, std.math.maxInt(u32), 16, std.math.maxInt(u32));
-        mdf_check(false, flags, std.math.maxInt(u32), std.math.maxInt(u32), std.math.maxInt(u32), std.math.maxInt(u32));
+        try mdf_check(false, flags, 0, 0, 0, 1024);
+        try mdf_check(false, flags, 0, 0, 16, 0);
+        try mdf_check(true, flags, 1, 1, 1, 31);
+        try mdf_check(false, flags, 1, 32, 1, 1024);
+        try mdf_check(true, flags, 2, 1, 2, 29);
+        try mdf_check(false, flags, 2, 30, 2, 1024);
+        try mdf_check(true, flags, 3, 1, 3, 31);
+        try mdf_check(false, flags, 3, 32, 3, 1024);
+        try mdf_check(true, flags, 4, 1, 4, 30);
+        try mdf_check(false, flags, 4, 31, 4, 1024);
+        try mdf_check(true, flags, 5, 1, 5, 31);
+        try mdf_check(false, flags, 5, 32, 5, 1024);
+        try mdf_check(true, flags, 6, 1, 6, 30);
+        try mdf_check(false, flags, 6, 31, 6, 1024);
+        try mdf_check(true, flags, 7, 1, 7, 31);
+        try mdf_check(false, flags, 7, 32, 7, 1024);
+        try mdf_check(true, flags, 8, 1, 8, 31);
+        try mdf_check(false, flags, 8, 32, 8, 1024);
+        try mdf_check(true, flags, 9, 1, 9, 30);
+        try mdf_check(false, flags, 9, 31, 9, 1024);
+        try mdf_check(true, flags, 10, 1, 10, 31);
+        try mdf_check(false, flags, 10, 32, 10, 1024);
+        try mdf_check(true, flags, 11, 1, 11, 30);
+        try mdf_check(false, flags, 11, 31, 11, 1024);
+        try mdf_check(true, flags, 12, 1, 12, 31);
+        try mdf_check(false, flags, 12, 32, 12, 1024);
+        try mdf_check(false, flags, 13, 0, 16, 1024);
+        try mdf_check(false, flags, std.math.maxInt(u32), 0, std.math.maxInt(u32), 1024);
+        try mdf_check(false, flags, 0, std.math.maxInt(u32), 16, std.math.maxInt(u32));
+        try mdf_check(false, flags, std.math.maxInt(u32), std.math.maxInt(u32), std.math.maxInt(u32), std.math.maxInt(u32));
     }
 }
 

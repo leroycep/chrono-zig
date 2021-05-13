@@ -110,7 +110,7 @@ pub fn formatNaiveDateTime(writer: anytype, comptime format: []const u8, dt: Nai
 test "parse format string" {
     const formatter = try Formatter.parse(std.testing.allocator, "%Y-%m-%d %H:%M:%S");
     defer formatter.deinit();
-    std.testing.expectEqualSlices(Part, &[_]Part{
+    try std.testing.expectEqualSlices(Part, &[_]Part{
         .{ .Specifier = .FullYear },
         .{ .Literal = '-' },
         .{ .Specifier = .MonthNumber },
@@ -145,7 +145,7 @@ test "format naive datetimes" {
 
         try formatter.formatNaiveDateTime(str.writer(), case.datetime);
 
-        std.testing.expectEqualSlices(u8, case.expected_string, str.items);
+        try std.testing.expectEqualSlices(u8, case.expected_string, str.items);
     }
 }
 
@@ -166,6 +166,6 @@ test "comptime format naive datetimes" {
 
         try formatNaiveDateTime(str.writer(), "%Y-%m-%d %H:%M:%S", case.datetime);
         
-        std.testing.expectEqualSlices(u8, case.expected_string, str.items);
+        try std.testing.expectEqualSlices(u8, case.expected_string, str.items);
     }
 }

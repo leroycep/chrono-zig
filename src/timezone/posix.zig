@@ -280,17 +280,17 @@ pub fn parse(string: []const u8) !TZ {
 test "posix TZ string" {
     const result = try parse("MST7MDT,M3.2.0,M11.1.0");
 
-    testing.expectEqualSlices(u8, "MST", result.std);
-    testing.expectEqual(@as(i32, 25200), result.std_offset);
-    testing.expectEqualSlices(u8, "MDT", result.dst.?);
-    testing.expectEqual(@as(i32, 28800), result.dst_offset);
-    testing.expectEqual(TZ.Rule{ .MonthWeekDay = .{ .m = 3, .n = 2, .d = 0, .time = 2 * std.time.s_per_hour } }, result.dst_range.?.start);
-    testing.expectEqual(TZ.Rule{ .MonthWeekDay = .{ .m = 11, .n = 1, .d = 0, .time = 2 * std.time.s_per_hour } }, result.dst_range.?.end);
+    try testing.expectEqualSlices(u8, "MST", result.std);
+    try testing.expectEqual(@as(i32, 25200), result.std_offset);
+    try testing.expectEqualSlices(u8, "MDT", result.dst.?);
+    try testing.expectEqual(@as(i32, 28800), result.dst_offset);
+    try testing.expectEqual(TZ.Rule{ .MonthWeekDay = .{ .m = 3, .n = 2, .d = 0, .time = 2 * std.time.s_per_hour } }, result.dst_range.?.start);
+    try testing.expectEqual(TZ.Rule{ .MonthWeekDay = .{ .m = 11, .n = 1, .d = 0, .time = 2 * std.time.s_per_hour } }, result.dst_range.?.end);
 
-    testing.expectEqual(@as(i32, 25200), result.offset(1612734960).offset);
-    testing.expectEqual(@as(i32, 25200), result.offset(1615712399 - 7 * std.time.s_per_hour).offset);
-    testing.expectEqual(@as(i32, 28800), result.offset(1615712400 - 7 * std.time.s_per_hour).offset);
-    testing.expectEqual(@as(i32, 28800), result.offset(1620453601).offset);
-    testing.expectEqual(@as(i32, 28800), result.offset(1636275599 - 7 * std.time.s_per_hour).offset);
-    testing.expectEqual(@as(i32, 25200), result.offset(1636275600 - 7 * std.time.s_per_hour).offset);
+    try testing.expectEqual(@as(i32, 25200), result.offset(1612734960).offset);
+    try testing.expectEqual(@as(i32, 25200), result.offset(1615712399 - 7 * std.time.s_per_hour).offset);
+    try testing.expectEqual(@as(i32, 28800), result.offset(1615712400 - 7 * std.time.s_per_hour).offset);
+    try testing.expectEqual(@as(i32, 28800), result.offset(1620453601).offset);
+    try testing.expectEqual(@as(i32, 28800), result.offset(1636275599 - 7 * std.time.s_per_hour).offset);
+    try testing.expectEqual(@as(i32, 25200), result.offset(1636275600 - 7 * std.time.s_per_hour).offset);
 }

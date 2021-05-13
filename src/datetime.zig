@@ -103,7 +103,7 @@ pub const NaiveDateTime = struct {
                 writer: anytype,
             ) !void {
                 if (fmt.len == 0) {
-                    return format_module.formatNaiveDateTime(writer, format_str, this.dt);
+                    try format_module.formatNaiveDateTime(writer, format_str, this.dt);
                 } else {
                     @compileError("Unknown format character: '" ++ fmt ++ "'");
                 }
@@ -112,28 +112,36 @@ pub const NaiveDateTime = struct {
     }
 
     pub fn formatted(this: @This(), comptime format_str: []const u8) Formatted(format_str) {
-        return Formatted(format_str){
-            .dt = this,
-        };
+        return Formatted(format_str){ .dt = this };
+    }
+
+    pub fn format(
+        this: @This(),
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        try format_module.formatNaiveDateTime(writer, fmt, this);
     }
 };
 
 test "naive datetime from timestamp" {
-    std.testing.expectEqual(NaiveDate.ymd(1969, 12, 31).?.hms(23, 59, 59), NaiveDateTime.from_timestamp(-1, 0));
-    std.testing.expectEqual(NaiveDate.ymd(1970, 1, 1).?.hms(0, 0, 0), NaiveDateTime.from_timestamp(0, 0));
-    std.testing.expectEqual(NaiveDate.ymd(1970, 1, 1).?.hms(0, 0, 1), NaiveDateTime.from_timestamp(1, 0));
-    std.testing.expectEqual(NaiveDate.ymd(2001, 9, 9).?.hms(1, 46, 40), NaiveDateTime.from_timestamp(1000000000, 0));
-    std.testing.expectEqual(NaiveDate.ymd(2038, 1, 19).?.hms(3, 14, 7), NaiveDateTime.from_timestamp(0x7fffffff, 0));
-    std.testing.expectEqual(@as(?NaiveDateTime, null), NaiveDateTime.from_timestamp(std.math.minInt(i64), 0));
-    std.testing.expectEqual(@as(?NaiveDateTime, null), NaiveDateTime.from_timestamp(std.math.minInt(i64) + 1, 0));
-    std.testing.expectEqual(@as(?NaiveDateTime, null), NaiveDateTime.from_timestamp(std.math.maxInt(i64), 0));
-    std.testing.expectEqual(@as(?NaiveDateTime, null), NaiveDateTime.from_timestamp(std.math.maxInt(i64) - 1, 0));
+    try std.testing.expectEqual(NaiveDate.ymd(1969, 12, 31).?.hms(23, 59, 59), NaiveDateTime.from_timestamp(-1, 0));
+    try std.testing.expectEqual(NaiveDate.ymd(1970, 1, 1).?.hms(0, 0, 0), NaiveDateTime.from_timestamp(0, 0));
+    try std.testing.expectEqual(NaiveDate.ymd(1970, 1, 1).?.hms(0, 0, 1), NaiveDateTime.from_timestamp(1, 0));
+    try std.testing.expectEqual(NaiveDate.ymd(2001, 9, 9).?.hms(1, 46, 40), NaiveDateTime.from_timestamp(1000000000, 0));
+    try std.testing.expectEqual(NaiveDate.ymd(2038, 1, 19).?.hms(3, 14, 7), NaiveDateTime.from_timestamp(0x7fffffff, 0));
+    try std.testing.expectEqual(@as(?NaiveDateTime, null), NaiveDateTime.from_timestamp(std.math.minInt(i64), 0));
+    try std.testing.expectEqual(@as(?NaiveDateTime, null), NaiveDateTime.from_timestamp(std.math.minInt(i64) + 1, 0));
+    try std.testing.expectEqual(@as(?NaiveDateTime, null), NaiveDateTime.from_timestamp(std.math.maxInt(i64), 0));
+    try std.testing.expectEqual(@as(?NaiveDateTime, null), NaiveDateTime.from_timestamp(std.math.maxInt(i64) - 1, 0));
 }
 
 test "Pacific/Honolulu datetime from timestamp" {
     var fbs = std.io.fixedBufferStream(@embedFile("timezone/zoneinfo/Pacific/Honolulu"));
-    const honolulu = timezone.TimeZone{ .TZif = try timezone.tzif.parse(std.testing.allocator, fbs.reader(), fbs.seekableStream()) };
-    defer honolulu.deinit();
+    const honolulu_tzif = timezone.TZif{ .tzif = try timezone.tzif.parse(std.testing.allocator, fbs.reader(), fbs.seekableStream()) };
+    defer honolulu_tzif.deinit();
+    const honolulu = &honolulu_tzif.timezone;
 
     const Case = struct {
         timestamp: i64,
@@ -145,16 +153,21 @@ test "Pacific/Honolulu datetime from timestamp" {
     };
 
     for (cases) |case| {
-        const dt = NaiveDateTime.from_timestamp(case.timestamp, 0).?.with_timezone(&honolulu);
-        std.testing.expectEqual(case.local_time, dt.toNaiveDateTime());
+        const dt = NaiveDateTime.from_timestamp(case.timestamp, 0).?.with_timezone(honolulu);
+        try std.testing.expectEqual(case.local_time, dt.toNaiveDateTime());
     }
 }
 
 test "naive datetime .formatted()" {
-    var str = std.ArrayList(u8).init(std.testing.allocator);
-    defer str.deinit();
-
-    try str.writer().print("{}", .{NaiveDate.ymd(2021, 02, 18).?.hms(17, 00, 00).?.formatted("%Y-%m-%d %H:%M:%S")});
-
-    std.testing.expectEqualSlices(u8, "2021-02-18 17:00:00", str.items);
+    var a = std.testing.allocator;
+    {
+        const str = try std.fmt.allocPrint(a, "{}", .{NaiveDate.ymd(2021, 02, 18).?.hms(17, 00, 00).?.formatted("%Y-%m-%d %H:%M:%S")});
+        defer a.free(str);
+        try std.testing.expectEqualSlices(u8, "2021-02-18 17:00:00", str);
+    }
+    {
+        const str = try std.fmt.allocPrint(a, "{%F %T}", .{NaiveDate.ymd(2021, 02, 18).?.hms(17, 00, 00).?});
+        defer a.free(str);
+        try std.testing.expectEqualSlices(u8, "2021-02-18 17:00:00", str);
+    }
 }
