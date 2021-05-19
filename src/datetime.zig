@@ -7,6 +7,7 @@ const TimeZone = timezone.TimeZone;
 const internals = @import("./internals.zig");
 const format_module = @import("./format.zig");
 const IsoWeek = @import("./IsoWeek.zig");
+const Weekday = @import("./lib.zig").Weekday;
 
 const DAYS_AFTER_ZERO_EPOCH = 719163;
 const EPOCH = NaiveDate.ymd(1970, 01, 01).?.hms(0, 0, 0).?;
@@ -99,6 +100,10 @@ pub const NaiveDateTime = struct {
 
     pub fn isoweek(this: @This()) IsoWeek {
         return this.date.isoweek();
+    }
+
+    pub fn weekday(this: @This()) Weekday {
+        return this.date.weekday();
     }
 
     pub fn Formatted(comptime format_str: []const u8) type {

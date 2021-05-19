@@ -42,11 +42,11 @@ pub const NaiveDate = struct {
         return from_of(year_param, of);
     }
 
-    pub fn isoywd(yearNum: YearInt, week: u32, weekday: Weekday) ?@This() {
+    pub fn isoywd(yearNum: YearInt, week: u32, weekdayParam: Weekday) ?@This() {
         const flags = YearFlags.from_year(yearNum);
         const nweeks = flags.nisoweeks();
         if (1 <= week and week <= nweeks) {
-            const weekord = week * 7 + @enumToInt(weekday);
+            const weekord = week * 7 + @enumToInt(weekdayParam);
             const delta = flags.isoweek_delta();
             if (weekord <= delta) {
                 const prevflags = YearFlags.from_year(yearNum - 1);
@@ -136,6 +136,11 @@ pub const NaiveDate = struct {
 
     pub fn isoweek(this: @This()) IsoWeek {
         return IsoWeek.from_yof(this._year, this._of);
+    }
+
+    pub fn weekday(this: @This()) Weekday {
+        const weekord = this._of.ordinal +% this._of.year_flags.isoweek_delta();
+        return @intToEnum(Weekday, @intCast(u3, weekord % 7));
     }
 
     pub fn signed_duration_since(this: @This(), other: @This()) i64 {
