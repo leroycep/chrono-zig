@@ -8,9 +8,9 @@ year: YearInt,
 week: WeekInt,
 
 pub fn from_yof(year: YearInt, of: internals.Of) @This() {
-    const weekord = of.ordinal +% of.flags.isoweek_delta();
+    const weekord = of.ordinal +% of.year_flags.isoweek_delta();
     const raw_week = weekord / 7;
-    const weekday = @intToEnum(Weekday, weekord % 7);
+    const weekday = @intToEnum(Weekday, @intCast(u3, weekord % 7));
 
     if (raw_week < 1) {
         const prevlastweek = YearFlags.from_year(year - 1).nisoweeks();
@@ -19,7 +19,7 @@ pub fn from_yof(year: YearInt, of: internals.Of) @This() {
             .week = prevlastweek,
         };
     } else {
-        const lastweek = of.flags.nisoweeks();
+        const lastweek = of.year_flags.nisoweeks();
         if (raw_week > lastweek) {
             return @This(){
                 .year = year + 1,
@@ -28,7 +28,7 @@ pub fn from_yof(year: YearInt, of: internals.Of) @This() {
         } else {
             return @This(){
                 .year = year,
-                .week = prevlastweek,
+                .week = @intCast(WeekInt, raw_week),
             };
         }
     }

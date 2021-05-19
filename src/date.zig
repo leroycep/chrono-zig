@@ -11,7 +11,7 @@ const MAX_YEAR = internals.MAX_YEAR;
 const NaiveTime = @import("./time.zig").NaiveTime;
 const NaiveDateTime = @import("./datetime.zig").NaiveDateTime;
 const Weekday = @import("./lib.zig").Weekday;
-const IsoWeek = @imporT("./IsoWeek.zig");
+const IsoWeek = @import("./IsoWeek.zig");
 
 // TODO: Make packed once packed structs aren't bugged
 pub const NaiveDate = struct {
@@ -50,7 +50,7 @@ pub const NaiveDate = struct {
             const delta = flags.isoweek_delta();
             if (weekord <= delta) {
                 const prevflags = YearFlags.from_year(yearNum - 1);
-                return @This() {
+                return @This(){
                     ._year = yearNum - 1,
                     ._of = internals.Of.new(weekord + prevflags.ndays() - delta, prevflags),
                 };
@@ -58,13 +58,13 @@ pub const NaiveDate = struct {
                 const ordinal = weekord - delta;
                 const ndays = flags.ndays();
                 if (ordinal <= ndays) {
-                    return @This() {
+                    return @This(){
                         ._year = yearNum,
                         ._of = internals.Of.new(ordinal, flags),
                     };
                 } else {
-                    const nextflags = YearFlags.from_year(yearNum+ 1);
-                    return @This() {
+                    const nextflags = YearFlags.from_year(yearNum + 1);
+                    return @This(){
                         ._year = yearNum + 1,
                         ._of = internals.Of.new(ordinal - ndays, nextflags),
                     };
@@ -125,17 +125,17 @@ pub const NaiveDate = struct {
     pub fn year(this: @This()) YearInt {
         return this._year;
     }
-    
+
     pub fn month(this: @This()) MonthInt {
         return this._of.to_mdf().month;
     }
-    
+
     pub fn day(this: @This()) internals.DayInt {
         return this._of.to_mdf().day;
     }
-    
+
     pub fn isoweek(this: @This()) IsoWeek {
-        return IsoWeek.from_yof(this.year, this.of);
+        return IsoWeek.from_yof(this._year, this._of);
     }
 
     pub fn signed_duration_since(this: @This(), other: @This()) i64 {

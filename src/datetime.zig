@@ -6,6 +6,7 @@ const timezone = @import("./timezone.zig");
 const TimeZone = timezone.TimeZone;
 const internals = @import("./internals.zig");
 const format_module = @import("./format.zig");
+const IsoWeek = @import("./IsoWeek.zig");
 
 const DAYS_AFTER_ZERO_EPOCH = 719163;
 const EPOCH = NaiveDate.ymd(1970, 01, 01).?.hms(0, 0, 0).?;
@@ -22,6 +23,10 @@ pub const DateTime = struct {
 
     pub fn local(date: NaiveDate, time: NaiveTime, tz: *const TimeZone) @This() {
         @compileError("Creating DateTime using localtime is not yet implemented");
+    }
+
+    pub fn toTimestamp(this: @This()) i64 {
+        return this.datetime.signed_duration_since(EPOCH);
     }
 
     pub fn toNaiveDateTime(this: @This()) NaiveDateTime {
@@ -91,7 +96,7 @@ pub const NaiveDateTime = struct {
     pub fn second(this: @This()) time_module.SecondsInt {
         return this.time.second();
     }
-    
+
     pub fn isoweek(this: @This()) IsoWeek {
         return this.date.isoweek();
     }

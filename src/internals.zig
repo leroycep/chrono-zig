@@ -158,8 +158,8 @@ pub const YearFlags = packed struct {
         return @as(u32, 366) - (this.flags >> 3);
     }
 
-    pub fn nisoweeks(this: @This()) u32 {
-        return 52 + ((@as(u32, 0b0000_0100_0000_0110) >> this.flags) & 1);
+    pub fn nisoweeks(this: @This()) WeekInt {
+        return 52 + @intCast(WeekInt, (@as(u32, 0b0000_0100_0000_0110) >> this.flags) & 1);
     }
 
     pub fn isoweek_delta(this: @This()) u32 {
