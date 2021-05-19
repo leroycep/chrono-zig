@@ -10,6 +10,7 @@ const MIN_YEAR = internals.MIN_YEAR;
 const MAX_YEAR = internals.MAX_YEAR;
 const NaiveTime = @import("./time.zig").NaiveTime;
 const NaiveDateTime = @import("./datetime.zig").NaiveDateTime;
+const Weekday = @import("./lib.zig").Weekday;
 
 // TODO: Make packed once packed structs aren't bugged
 pub const NaiveDate = struct {
@@ -38,6 +39,39 @@ pub const NaiveDate = struct {
         const flags = internals.YearFlags.from_year(year_param);
         const of = internals.Of.new(ordinal, flags);
         return from_of(year_param, of);
+    }
+
+    pub fn isoywd(yearNum: YearInt, week: u32, weekday: Weekday) ?@This() {
+        const flags = YearFlags.from_year(yearNum);
+        const nweeks = flags.nisoweeks();
+        if (1 <= week and week <= nweeks) {
+            const weekord = week * 7 + @enumToInt(weekday);
+            const delta = flags.isoweek_delta();
+            if (weekord <= delta) {
+                const prevflags = YearFlags.from_year(yearNum - 1);
+                return @This() {
+                    ._year = yearNum - 1,
+                    ._of = internals.Of.new(weekord + prevflags.ndays() - delta, prevflags),
+                };
+            } else {
+                const ordinal = weekord - delta;
+                const ndays = flags.ndays();
+                if (ordinal <= ndays) {
+                    return @This() {
+                        ._year = yearNum,
+                        ._of = internals.Of.new(ordinal, flags),
+                    };
+                } else {
+                    const nextflags = YearFlags.from_year(yearNum+ 1);
+                    return @This() {
+                        ._year = yearNum + 1,
+                        ._of = internals.Of.new(ordinal - ndays, nextflags),
+                    };
+                }
+            }
+        } else {
+            return null;
+        }
     }
 
     pub fn succ(this: @This()) ?@This() {
@@ -158,6 +192,35 @@ test "date from year-ordinal" {
     try std.testing.expectEqual(ymd(2014, 10, 27).?, yo(2014, 300).?);
     try std.testing.expectEqual(ymd(2014, 12, 31).?, yo(2014, 365).?);
     try std.testing.expectEqual(null_date, yo(2014, 366));
+}
+
+test "date from isoywd" {
+    const isoywd = NaiveDate.isoywd;
+    const ymd = NaiveDate.ymd;
+    const null_date = @as(?NaiveDate, null);
+
+    try std.testing.expectEqual(null_date, isoywd(2004, 0, .sun));
+    try std.testing.expectEqual(ymd(2003, 12, 29).?, isoywd(2004, 1, .mon).?);
+    try std.testing.expectEqual(ymd(2004, 1, 4).?, isoywd(2004, 1, .sun).?);
+    try std.testing.expectEqual(ymd(2004, 1, 5).?, isoywd(2004, 2, .mon).?);
+    try std.testing.expectEqual(ymd(2004, 1, 11).?, isoywd(2004, 2, .sun).?);
+    try std.testing.expectEqual(ymd(2004, 12, 20).?, isoywd(2004, 52, .mon).?);
+    try std.testing.expectEqual(ymd(2004, 12, 26).?, isoywd(2004, 52, .sun).?);
+    try std.testing.expectEqual(ymd(2004, 12, 27).?, isoywd(2004, 53, .mon).?);
+    try std.testing.expectEqual(ymd(2005, 1, 2).?, isoywd(2004, 53, .sun).?);
+    try std.testing.expectEqual(null_date, isoywd(2004, 54, .mon));
+
+    try std.testing.expectEqual(null_date, isoywd(2011, 0, .sun));
+    try std.testing.expectEqual(ymd(2011, 1, 3).?, isoywd(2011, 1, .mon).?);
+    try std.testing.expectEqual(ymd(2011, 1, 9).?, isoywd(2011, 1, .sun).?);
+    try std.testing.expectEqual(ymd(2011, 1, 10).?, isoywd(2011, 2, .mon).?);
+    try std.testing.expectEqual(ymd(2011, 1, 16).?, isoywd(2011, 2, .sun).?);
+
+    try std.testing.expectEqual(ymd(2018, 12, 17).?, isoywd(2018, 51, .mon).?);
+    try std.testing.expectEqual(ymd(2018, 12, 23).?, isoywd(2018, 51, .sun).?);
+    try std.testing.expectEqual(ymd(2018, 12, 24).?, isoywd(2018, 52, .mon).?);
+    try std.testing.expectEqual(ymd(2018, 12, 30).?, isoywd(2018, 52, .sun).?);
+    try std.testing.expectEqual(null_date, isoywd(2018, 53, .mon));
 }
 
 test "date successor" {

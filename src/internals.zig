@@ -161,6 +161,14 @@ pub const YearFlags = packed struct {
         return 52 + ((@as(u32, 0b0000_0100_0000_0110) >> this.flags) & 1);
     }
 
+    pub fn isoweek_delta(this: @This()) u32 {
+        var delta = @as(u32, this.flags) & 0b0111;
+        if (delta < 3) {
+            delta += 7;
+        }
+        return delta;
+    }
+
     pub fn isleapyear(this: @This()) bool {
         return this.flags & 0b1000 == 0;
     }
