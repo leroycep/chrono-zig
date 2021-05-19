@@ -91,6 +91,10 @@ pub const NaiveDateTime = struct {
     pub fn second(this: @This()) time_module.SecondsInt {
         return this.time.second();
     }
+    
+    pub fn isoweek(this: @This()) IsoWeek {
+        return this.date.isoweek();
+    }
 
     pub fn Formatted(comptime format_str: []const u8) type {
         return struct {

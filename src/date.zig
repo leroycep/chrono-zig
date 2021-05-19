@@ -11,6 +11,7 @@ const MAX_YEAR = internals.MAX_YEAR;
 const NaiveTime = @import("./time.zig").NaiveTime;
 const NaiveDateTime = @import("./datetime.zig").NaiveDateTime;
 const Weekday = @import("./lib.zig").Weekday;
+const IsoWeek = @imporT("./IsoWeek.zig");
 
 // TODO: Make packed once packed structs aren't bugged
 pub const NaiveDate = struct {
@@ -131,6 +132,10 @@ pub const NaiveDate = struct {
     
     pub fn day(this: @This()) internals.DayInt {
         return this._of.to_mdf().day;
+    }
+    
+    pub fn isoweek(this: @This()) IsoWeek {
+        return IsoWeek.from_yof(this.year, this.of);
     }
 
     pub fn signed_duration_since(this: @This(), other: @This()) i64 {

@@ -5,6 +5,7 @@ pub const YearInt = i19;
 pub const OrdinalInt = u9;
 pub const MonthInt = u4;
 pub const DayInt = u5;
+pub const WeekInt = u6;
 
 pub const MAX_YEAR = std.math.maxInt(YearInt);
 pub const MIN_YEAR = std.math.minInt(YearInt);
