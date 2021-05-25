@@ -4,6 +4,8 @@ pub const datetime = @import("./datetime.zig");
 pub const timezone = @import("./timezone.zig");
 pub const format = @import("./format.zig");
 
+pub const IsoWeek = @import("./IsoWeek.zig");
+
 pub const Weekday = enum(u3) {
     mon = 0,
     tue = 1,
