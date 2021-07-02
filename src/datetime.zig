@@ -23,6 +23,9 @@ pub const DateTime = struct {
     }
 
     pub fn local(date: NaiveDate, time: NaiveTime, tz: *const TimeZone) @This() {
+        _ = tz;
+        _ = time;
+        _ = date;
         @compileError("Creating DateTime using localtime is not yet implemented");
     }
 
@@ -113,7 +116,7 @@ pub const NaiveDateTime = struct {
             pub fn format(
                 this: @This(),
                 comptime fmt: []const u8,
-                options: std.fmt.FormatOptions,
+                _: std.fmt.FormatOptions,
                 writer: anytype,
             ) !void {
                 if (fmt.len == 0) {
@@ -132,7 +135,7 @@ pub const NaiveDateTime = struct {
     pub fn format(
         this: @This(),
         comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
+        _: std.fmt.FormatOptions,
         writer: anytype,
     ) !void {
         try format_module.formatNaiveDateTime(writer, fmt, this);

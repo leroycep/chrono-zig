@@ -86,7 +86,7 @@ pub const Posix = struct {
 
     fn utcToLocal(timezone: *const TimeZone, timestamp: i64) i64 {
         const this = @fieldParentPtr(@This(), "timezone", timezone);
-        const offset_res = tz.offset(timestamp);
+        const offset_res = this.tz.offset(timestamp);
         return timestamp + offset_res.offset;
     }
 };
@@ -99,7 +99,7 @@ pub const Wasm = struct {
 
     const wasm = @import("timezone/wasm.zig");
 
-    fn utcToLocal(timezone: *const TimeZone, timestamp: i64) i64 {
+    fn utcToLocal(_: *const TimeZone, timestamp: i64) i64 {
         return wasm.utcToLocal(timestamp);
     }
 };
