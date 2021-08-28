@@ -23,7 +23,7 @@ pub fn hhmmss_offset_to_s(_string: []const u8, idx: *usize) !i32 {
 
     var result: i32 = 0;
 
-    var segment_iter = std.mem.split(string, ":");
+    var segment_iter = std.mem.split(u8, string, ":");
     const hour_string = segment_iter.next() orelse return error.EmptyString;
     const hours = try std.fmt.parseInt(u32, hour_string, 10);
     if (hours > 167) {
