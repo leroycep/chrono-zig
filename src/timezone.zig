@@ -1,6 +1,7 @@
 const std = @import("std");
 pub const posix = @import("./timezone/posix.zig");
 pub const tzif = @import("./timezone/tzif.zig");
+const builtin = @import("builtin");
 
 const FixedUTC = Fixed.init(0);
 pub const UTC = &FixedUTC.timezone;
@@ -15,12 +16,12 @@ pub const TimeZone = struct {
 
 var local_timezone: LocalTimeZone = undefined;
 pub fn getLocalTimeZone(allocator: *std.mem.Allocator) !*const TimeZone {
-    switch (std.builtin.os.tag) {
+    switch (builtin.os.tag) {
         .linux => {
             local_timezone = try TZif.load(allocator, "/etc/localtime");
             return &local_timezone.timezone;
         },
-        .freestanding => if (std.builtin.cpu.arch == .wasm32) {
+        .freestanding => if (builtin.cpu.arch == .wasm32) {
             local_timezone = Wasm{};
             return &local_timezone.timezone;
         } else @compileError("Platform not supported"),
@@ -28,11 +29,11 @@ pub fn getLocalTimeZone(allocator: *std.mem.Allocator) !*const TimeZone {
     }
 }
 pub fn deinitLocalTimeZone() void {
-    switch (std.builtin.os.tag) {
+    switch (builtin.os.tag) {
         .linux => {
             local_timezone.deinit();
         },
-        .freestanding => if (std.builtin.cpu.arch == .wasm32) {} else @compileError("Platform not supported"),
+        .freestanding => if (builtin.cpu.arch == .wasm32) {} else @compileError("Platform not supported"),
         else => @compileError("Platform not supported"),
     }
 }
@@ -105,9 +106,9 @@ pub const Wasm = struct {
 };
 
 // TODO: Give user more control over this?
-const LocalTimeZone = switch (std.builtin.os.tag) {
+const LocalTimeZone = switch (builtin.os.tag) {
     .linux => TZif,
-    .freestanding => if (std.builtin.cpu.arch == .wasm32) Wasm else @compileError("Platform not supported"),
+    .freestanding => if (builtin.cpu.arch == .wasm32) Wasm else @compileError("Platform not supported"),
     else => @compileError("Platform not supported"),
 };
 

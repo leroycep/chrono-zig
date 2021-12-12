@@ -1,4 +1,4 @@
-const std = @import ("std");
+const std = @import("std");
 
 pub const date = @import("./date.zig");
 pub const time = @import("./time.zig");
@@ -18,7 +18,7 @@ pub const Weekday = enum(u3) {
     sun = 6,
 };
 
-test "" {
+comptime {
     @import("std").testing.refAllDecls(@This());
 }
 
