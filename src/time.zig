@@ -36,8 +36,8 @@ pub const SecsInt = @Type(.{
     },
 });
 
-/// Frac can be up to two milliseconds to represent leap seconds
-pub const MAX_FRAC = 2 * std.time.ns_per_ms;
+/// Frac can be up to two seconds to represent leap seconds
+pub const MAX_FRAC = 2 * std.time.ns_per_s;
 pub const FracInt = @Type(.{
     .Int = .{
         .bits = std.math.log2_int_ceil(u64, MAX_FRAC),

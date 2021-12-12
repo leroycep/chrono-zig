@@ -4,100 +4,135 @@ const NaiveDateTime = @import("./datetime.zig").NaiveDateTime;
 const internals = @import("./internals.zig");
 const time = @import("./time.zig");
 
-pub const Specifier = enum {
-    FullYear,
-    MonthNumber,
-    DayNumber,
-    HourNumber24,
-    MinuteNumber,
-    SecondNumber,
+pub const Specifier = enum(u8) {
+    weekday = 'a',
+    full_weekday = 'A',
+
+    month = 'b',
+    full_month = 'B',
+    month_number = 'm',
+
+    full_year = 'Y',
+    day = 'd',
+    hour24 = 'H',
+    min = 'M',
+    sec = 'S',
+
+    isoweek_year = 'G',
+    isoweek_number = 'V',
+
+    /// Same as %Y-%m-%d
+    iso_date = 'F',
+    iso_time = 'T',
+    hour24_and_min = 'R',
+
+    pub fn formatNaiveDateTime(
+        this: @This(),
+        writer: anytype,
+        dt: NaiveDateTime,
+    ) !void {
+        switch (this) {
+            .weekday => try writer.print("{d}", .{dt.weekday().shortName()}),
+            .full_weekday => try writer.print("{d}", .{dt.weekday().fullName()}),
+
+            .month => try writer.print("{d}", .{dt.month().shortName()}),
+            .full_month => try writer.print("{d}", .{dt.month().fullName()}),
+            .month_number => try writer.print("{d:0>2}", .{dt.month().number()}),
+
+            .full_year => try writer.print("{d}", .{dt.year()}),
+            .day => try writer.print("{d:0>2}", .{dt.day()}),
+
+            // Time specifiers
+            .hour24 => try writer.print("{d:0>2}", .{dt.hour()}),
+            .min => try writer.print("{d:0>2}", .{dt.minute()}),
+            .sec => try writer.print("{d:0>2}", .{dt.second()}),
+
+            // ISOWeek specifiers
+            .isoweek_year => try writer.print("{d:0>2}", .{dt.isoweek().year}),
+            .isoweek_number => try writer.print("{d:0>2}", .{dt.isoweek().week}),
+
+            // Combined time specifiers
+            .iso_date => try writer.print("{d}-{d:0>2}-{d:0>2}", .{ dt.year(), dt.month().number(), dt.day() }),
+            .hour24_and_min => try writer.print("{d:0>2}:{d:0>2}", .{ dt.hour(), dt.minute() }),
+            .iso_time => try writer.print("{d:0>2}:{d:0>2}:{d:0>2}", .{ dt.hour(), dt.minute(), dt.second() }),
+        }
+    }
 };
 
 pub const Part = union(enum) {
-    Literal: u8,
-    Specifier: Specifier,
-};
+    literal: u8,
+    specifier: Specifier,
 
-pub const Formatter = struct {
-    allocator: *std.mem.Allocator,
-    parts: []Part,
-
-    pub fn parse(allocator: *std.mem.Allocator, format_str: []const u8) !@This() {
-        var parts = std.ArrayList(Part).init(allocator);
-        errdefer parts.deinit();
-
-        var next_char_is_specifier = false;
-        for (format_str) |fc| {
-            if (next_char_is_specifier) {
-                const specifier: Specifier = switch (fc) {
-                    'Y' => .FullYear,
-                    'm' => .MonthNumber,
-                    'd' => .DayNumber,
-                    'H' => .HourNumber24,
-                    'M' => .MinuteNumber,
-                    'S' => .SecondNumber,
-                    else => return error.InvalidFormat,
-                };
-                try parts.append(.{ .Specifier = specifier });
-                next_char_is_specifier = false;
-            } else {
-                if (fc == '%') {
-                    next_char_is_specifier = true;
-                } else {
-                    try parts.append(.{ .Literal = fc });
-                }
-            }
-        }
-
-        return @This(){
-            .allocator = allocator,
-            .parts = parts.toOwnedSlice(),
-        };
-    }
-
-    pub fn deinit(this: @This()) void {
-        this.allocator.free(this.parts);
-    }
-
-    pub fn formatNaiveDateTime(this: @This(), writer: anytype, dt: NaiveDateTime) !void {
-        for (this.parts) |part| {
-            switch (part) {
-                .Literal => |lit| try writer.writeByte(lit),
-                .Specifier => |specifier| switch (specifier) {
-                    .FullYear => try writer.print("{d}", .{dt.year()}),
-                    .MonthNumber => try writer.print("{d:0>2}", .{dt.month()}),
-                    .DayNumber => try writer.print("{d:0>2}", .{dt.day()}),
-                    .HourNumber24 => try writer.print("{d:0>2}", .{dt.hour()}),
-                    .MinuteNumber => try writer.print("{d:0>2}", .{dt.minute()}),
-                    .SecondNumber => try writer.print("{d:0>2}", .{dt.second()}),
-                },
-            }
+    pub fn formatNaiveDateTime(
+        this: @This(),
+        writer: anytype,
+        dt: NaiveDateTime,
+    ) !void {
+        switch (this) {
+            .literal => |b| try writer.writeByte(b),
+            .specifier => |s| try s.formatNaiveDateTime(writer, dt),
         }
     }
 };
 
-pub fn formatNaiveDateTime(writer: anytype, comptime format: []const u8, dt: NaiveDateTime) !void {
-    comptime var next_char_is_specifier = false;
-    inline for (format) |fc| {
+pub fn parseFormatBuf(buf: []Part, format_str: []const u8) ![]Part {
+    var parts_idx: usize = 0;
+
+    var next_char_is_specifier = false;
+    for (format_str) |fc| {
         if (next_char_is_specifier) {
-            switch (fc) {
-                'F' => try writer.print("{d}-{d:0>2}-{d:0>2}", .{ dt.year(), dt.month(), dt.day() }),
-                'Y' => try writer.print("{d}", .{dt.year()}),
-                'm' => try writer.print("{d:0>2}", .{dt.month()}),
-                'd' => try writer.print("{d:0>2}", .{dt.day()}),
-
-                // Time specifiers
-                'H' => try writer.print("{d:0>2}", .{dt.hour()}),
-                'M' => try writer.print("{d:0>2}", .{dt.minute()}),
-                'S' => try writer.print("{d:0>2}", .{dt.second()}),
-
-                // Combined time specifiers
-                'R' => try writer.print("{d:0>2}:{d:0>2}", .{ dt.hour(), dt.minute() }),
-                'T' => try writer.print("{d:0>2}:{d:0>2}:{d:0>2}", .{ dt.hour(), dt.minute(), dt.second() }),
-
-                ';' => try writer.writeByte(':'),
-                else => @compileError("Invalid date format specifier " ++ fc),
+            buf[parts_idx] = .{
+                .specifier = std.meta.intToEnum(Specifier, fc) catch return error.InvalidSpecifier,
+            };
+            parts_idx += 1;
+            next_char_is_specifier = false;
+        } else {
+            if (fc == '%') {
+                next_char_is_specifier = true;
+            } else {
+                buf[parts_idx] = .{ .literal = fc };
+                parts_idx += 1;
             }
+        }
+    }
+
+    return buf[0..parts_idx];
+}
+
+pub fn parseFormatAlloc(allocator: *std.mem.Allocator, format_str: []const u8) ![]Part {
+    var parts = std.ArrayList(Part).init(allocator);
+    errdefer parts.deinit();
+
+    var next_char_is_specifier = false;
+    for (format_str) |fc| {
+        if (next_char_is_specifier) {
+            const specifier = std.meta.intToEnum(Specifier, fc) catch return error.InvalidSpecifier;
+            try parts.append(.{ .specifier = specifier });
+            next_char_is_specifier = false;
+        } else {
+            if (fc == '%') {
+                next_char_is_specifier = true;
+            } else {
+                try parts.append(.{ .literal = fc });
+            }
+        }
+    }
+
+    return parts.toOwnedSlice();
+}
+
+pub fn formatNaiveDateTimeParts(writer: anytype, parts: []const Part, dt: NaiveDateTime) !void {
+    for (parts) |part| {
+        try part.formatNaiveDateTime(writer, dt);
+    }
+}
+
+pub fn formatNaiveDateTime(writer: anytype, format: []const u8, dt: NaiveDateTime) !void {
+    var next_char_is_specifier = false;
+    for (format) |fc| {
+        if (next_char_is_specifier) {
+            const specifier = std.meta.intToEnum(Specifier, fc) catch return error.InvalidSpecifier;
+            try specifier.formatNaiveDateTime(writer, dt);
             next_char_is_specifier = false;
         } else {
             if (fc == '%') {
@@ -110,24 +145,24 @@ pub fn formatNaiveDateTime(writer: anytype, comptime format: []const u8, dt: Nai
 }
 
 test "parse format string" {
-    const formatter = try Formatter.parse(std.testing.allocator, "%Y-%m-%d %H:%M:%S");
-    defer formatter.deinit();
+    const parts = try parseFormatAlloc(std.testing.allocator, "%Y-%m-%d %H:%M:%S");
+    defer std.testing.allocator.free(parts);
     try std.testing.expectEqualSlices(Part, &[_]Part{
-        .{ .Specifier = .FullYear },
-        .{ .Literal = '-' },
-        .{ .Specifier = .MonthNumber },
-        .{ .Literal = '-' },
-        .{ .Specifier = .DayNumber },
-        .{ .Literal = ' ' },
-        .{ .Specifier = .HourNumber24 },
-        .{ .Literal = ':' },
-        .{ .Specifier = .MinuteNumber },
-        .{ .Literal = ':' },
-        .{ .Specifier = .SecondNumber },
-    }, formatter.parts);
+        .{ .specifier = .full_year },
+        .{ .literal = '-' },
+        .{ .specifier = .month_number },
+        .{ .literal = '-' },
+        .{ .specifier = .day },
+        .{ .literal = ' ' },
+        .{ .specifier = .hour24 },
+        .{ .literal = ':' },
+        .{ .specifier = .min },
+        .{ .literal = ':' },
+        .{ .specifier = .sec },
+    }, parts);
 }
 
-test "format naive datetimes" {
+test "format naive datetimes with parts api" {
     const Case = struct {
         datetime: NaiveDateTime,
         expected_string: []const u8,
@@ -138,20 +173,20 @@ test "format naive datetimes" {
         .{ .datetime = NaiveDate.ymd(1970, 01, 01).?.hms(0, 0, 0).?, .expected_string = "1970-01-01 00:00:00" },
     };
 
-    const formatter = try Formatter.parse(std.testing.allocator, "%Y-%m-%d %H:%M:%S");
-    defer formatter.deinit();
+    const parts = try parseFormatAlloc(std.testing.allocator, "%Y-%m-%d %H:%M:%S");
+    defer std.testing.allocator.free(parts);
 
     for (cases) |case| {
         var str = std.ArrayList(u8).init(std.testing.allocator);
         defer str.deinit();
 
-        try formatter.formatNaiveDateTime(str.writer(), case.datetime);
+        try formatNaiveDateTimeParts(str.writer(), parts, case.datetime);
 
-        try std.testing.expectEqualSlices(u8, case.expected_string, str.items);
+        try std.testing.expectEqualStrings(case.expected_string, str.items);
     }
 }
 
-test "comptime format naive datetimes" {
+test "format naive datetimes with format string api" {
     const Case = struct {
         datetime: NaiveDateTime,
         expected_string: []const u8,
@@ -168,7 +203,7 @@ test "comptime format naive datetimes" {
 
         try formatNaiveDateTime(str.writer(), "%Y-%m-%d %H:%M:%S", case.datetime);
 
-        try std.testing.expectEqualSlices(u8, case.expected_string, str.items);
+        try std.testing.expectEqualStrings(case.expected_string, str.items);
     }
 }
 

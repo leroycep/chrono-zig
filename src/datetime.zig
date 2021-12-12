@@ -8,6 +8,7 @@ const internals = @import("./internals.zig");
 const format_module = @import("./format.zig");
 const IsoWeek = @import("./IsoWeek.zig");
 const Weekday = @import("./lib.zig").Weekday;
+const Month = @import("./lib.zig").Month;
 
 const DAYS_AFTER_ZERO_EPOCH = 719163;
 const EPOCH = NaiveDate.ymd(1970, 01, 01).?.hms(0, 0, 0).?;
@@ -81,7 +82,7 @@ pub const NaiveDateTime = struct {
         return this.date.year();
     }
 
-    pub fn month(this: @This()) internals.MonthInt {
+    pub fn month(this: @This()) Month {
         return this.date.month();
     }
 
@@ -110,6 +111,8 @@ pub const NaiveDateTime = struct {
     }
 
     pub fn Formatted(comptime format_str: []const u8) type {
+        var parts_buf: [format_str.len]format_module.Part = undefined;
+        const parts = format_module.parseFormatBuf(&parts_buf, format_str) catch unreachable;
         return struct {
             dt: NaiveDateTime,
 
@@ -120,7 +123,7 @@ pub const NaiveDateTime = struct {
                 writer: anytype,
             ) !void {
                 if (fmt.len == 0) {
-                    try format_module.formatNaiveDateTime(writer, format_str, this.dt);
+                    try format_module.formatNaiveDateTimeParts(writer, parts, this.dt);
                 } else {
                     @compileError("Unknown format character: '" ++ fmt ++ "'");
                 }
@@ -138,7 +141,9 @@ pub const NaiveDateTime = struct {
         _: std.fmt.FormatOptions,
         writer: anytype,
     ) !void {
-        try format_module.formatNaiveDateTime(writer, fmt, this);
+        var buf: [fmt.len]format_module.Part = undefined;
+        const parts = format_module.parseFormatBuf(&buf, fmt) catch unreachable;
+        try format_module.formatNaiveDateTimeParts(writer, parts, this);
     }
 };
 
@@ -185,6 +190,6 @@ test "naive datetime .formatted()" {
     {
         const str = try std.fmt.allocPrint(a, "{%F %T}", .{NaiveDate.ymd(2021, 02, 18).?.hms(17, 00, 00).?});
         defer a.free(str);
-        try std.testing.expectEqualSlices(u8, "2021-02-18 17:00:00", str);
+        try std.testing.expectEqualStrings("2021-02-18 17:00:00", str);
     }
 }

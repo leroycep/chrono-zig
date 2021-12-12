@@ -12,6 +12,7 @@ const NaiveTime = @import("./time.zig").NaiveTime;
 const NaiveDateTime = @import("./datetime.zig").NaiveDateTime;
 const Weekday = @import("./lib.zig").Weekday;
 const IsoWeek = @import("./IsoWeek.zig");
+const Month = @import("./lib.zig").Month;
 
 // TODO: Make packed once packed structs aren't bugged
 pub const NaiveDate = struct {
@@ -126,8 +127,8 @@ pub const NaiveDate = struct {
         return this._year;
     }
 
-    pub fn month(this: @This()) MonthInt {
-        return this._of.to_mdf().month;
+    pub fn month(this: @This()) Month {
+        return @intToEnum(Month, this._of.to_mdf().month);
     }
 
     pub fn day(this: @This()) internals.DayInt {
