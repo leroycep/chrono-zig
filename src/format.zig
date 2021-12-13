@@ -32,11 +32,11 @@ pub const Specifier = enum(u8) {
         dt: NaiveDateTime,
     ) !void {
         switch (this) {
-            .weekday => try writer.print("{d}", .{dt.weekday().shortName()}),
-            .full_weekday => try writer.print("{d}", .{dt.weekday().fullName()}),
+            .weekday => try writer.print("{s}", .{dt.weekday().shortName()}),
+            .full_weekday => try writer.print("{s}", .{dt.weekday().fullName()}),
 
-            .month => try writer.print("{d}", .{dt.month().shortName()}),
-            .full_month => try writer.print("{d}", .{dt.month().fullName()}),
+            .month => try writer.print("{s}", .{dt.month().shortName()}),
+            .full_month => try writer.print("{s}", .{dt.month().fullName()}),
             .month_number => try writer.print("{d:0>2}", .{dt.month().number()}),
 
             .full_year => try writer.print("{d}", .{dt.year()}),
