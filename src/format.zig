@@ -48,7 +48,11 @@ pub const Specifier = enum(u8) {
             .sec => try writer.print("{d:0>2}", .{dt.second()}),
 
             // ISOWeek specifiers
-            .isoweek_year => try writer.print("{d:0>2}", .{dt.isoweek().year}),
+            .isoweek_year => if (dt.isoweek().year < 0) {
+                try writer.print("{d:0>4}", .{dt.isoweek().year});
+            } else {
+                try writer.print("{d:0>4}", .{@intCast(u64, dt.isoweek().year)});
+            },
             .isoweek_number => try writer.print("{d:0>2}", .{dt.isoweek().week}),
 
             // Combined time specifiers
