@@ -103,7 +103,7 @@ pub fn parseFormatBuf(buf: []Part, format_str: []const u8) ![]Part {
     return buf[0..parts_idx];
 }
 
-pub fn parseFormatAlloc(allocator: *std.mem.Allocator, format_str: []const u8) ![]Part {
+pub fn parseFormatAlloc(allocator: std.mem.Allocator, format_str: []const u8) ![]Part {
     var parts = std.ArrayList(Part).init(allocator);
     errdefer parts.deinit();
 

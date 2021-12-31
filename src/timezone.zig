@@ -15,7 +15,7 @@ pub const TimeZone = struct {
 };
 
 var local_timezone: LocalTimeZone = undefined;
-pub fn getLocalTimeZone(allocator: *std.mem.Allocator) !*const TimeZone {
+pub fn getLocalTimeZone(allocator: std.mem.Allocator) !*const TimeZone {
     switch (builtin.os.tag) {
         .linux => {
             local_timezone = try TZif.load(allocator, "/etc/localtime");
@@ -60,7 +60,7 @@ pub const TZif = struct {
     },
     tzif: tzif.TimeZone,
 
-    pub fn load(allocator: *std.mem.Allocator, path: []const u8) !@This() {
+    pub fn load(allocator: std.mem.Allocator, path: []const u8) !@This() {
         return @This(){
             .tzif = try tzif.parseFile(allocator, path),
         };
