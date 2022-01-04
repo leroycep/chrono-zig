@@ -5,6 +5,7 @@ pub const time = @import("./time.zig");
 pub const datetime = @import("./datetime.zig");
 pub const timezone = @import("./timezone.zig");
 pub const format = @import("./format.zig");
+pub const duration = @import("./duration.zig");
 
 pub const IsoWeek = @import("./IsoWeek.zig");
 
