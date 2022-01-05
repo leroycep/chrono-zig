@@ -8,9 +8,14 @@ pub const UTC = &FixedUTC.timezone;
 
 pub const TimeZone = struct {
     utcToLocalFn: fn (*const @This(), timestamp: i64) i64,
+    timezoneToUtcFn: fn (*const @This(), timestamp: i64) i64,
 
     pub fn utcToLocal(this: *const @This(), timestamp: i64) i64 {
         return this.utcToLocalFn(this, timestamp);
+    }
+
+    pub fn timezoneToUtc(this: *const @This(), timestamp: i64) i64 {
+        return this.timezoneToUtcFn(this, timestamp);
     }
 };
 
@@ -96,12 +101,17 @@ pub const Posix = struct {
 pub const Wasm = struct {
     timezone: TimeZone = .{
         .utcToLocalFn = utcToLocal,
+        .timezoneToUtcFn = timezoneToUtc,
     },
 
     const wasm = @import("timezone/wasm.zig");
 
     fn utcToLocal(_: *const TimeZone, timestamp: i64) i64 {
         return wasm.utcToLocal(timestamp);
+    }
+
+    fn timezoneToUtc(_: *const TimeZone, timestamp: i64) i64 {
+        return wasm.localToUtc(timestamp);
     }
 };
 

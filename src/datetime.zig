@@ -23,11 +23,13 @@ pub const DateTime = struct {
         return .{ .datetime = datetime, .timezone = tz };
     }
 
-    pub fn local(date: NaiveDate, time: NaiveTime, tz: *const TimeZone) @This() {
-        _ = tz;
-        _ = time;
-        _ = date;
-        @compileError("Creating DateTime using localtime is not yet implemented");
+    pub fn local(localDatetime: NaiveDateTime, tz: *const TimeZone) @This() {
+        const timezone_timestamp = localDatetime.signed_duration_since(EPOCH);
+        const timestamp = tz.timezoneToUtc(timezone_timestamp);
+        return .{
+            .datetime = NaiveDateTime.from_timestamp(timestamp, 0).?,
+            .timezone = tz,
+        };
     }
 
     pub fn toTimestamp(this: @This()) i64 {
