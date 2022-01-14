@@ -46,6 +46,7 @@ pub fn deinitLocalTimeZone() void {
 pub const Fixed = struct {
     timezone: TimeZone = .{
         .utcToLocalFn = utcToLocal,
+        .timezoneToUtcFn = timezoneToUtc,
     },
     offset: i64,
 
@@ -56,6 +57,11 @@ pub const Fixed = struct {
     fn utcToLocal(timezone: *const TimeZone, timestamp: i64) i64 {
         const this = @fieldParentPtr(@This(), "timezone", timezone);
         return timestamp + this.offset;
+    }
+
+    fn timezoneToUtc(timezone: *const TimeZone, timestamp: i64) i64 {
+        const this = @fieldParentPtr(@This(), "timezone", timezone);
+        return timestamp - this.offset;
     }
 };
 
