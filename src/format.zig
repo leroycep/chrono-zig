@@ -1,4 +1,5 @@
 const std = @import("std");
+const chrono = @import("./lib.zig");
 const NaiveDate = @import("./date.zig").NaiveDate;
 const NaiveDateTime = @import("./datetime.zig").NaiveDateTime;
 const internals = @import("./internals.zig");
@@ -301,6 +302,125 @@ pub fn parseNaiveDateTime(comptime format: []const u8, dtString: []const u8) !Na
     return NaiveDate.ymd(year.?, month.?, day.?).?.hms(hour.?, minute.?, second orelse 0).?;
 }
 
+pub const Parsed = struct {
+    year: ?internals.YearInt = null,
+    month: ?chrono.Month = null,
+    day: ?internals.DayInt = null,
+    hour: ?time.HoursInt = null,
+    minute: ?time.MinutesInt = null,
+    second: ?time.SecondsInt = null,
+
+    weekday: ?chrono.Weekday = null,
+
+    isoweek_year: ?internals.YearInt = null,
+    isoweek: ?internals.WeekInt = null,
+};
+
+pub fn parse(format: []const u8, dtString: []const u8) !Parsed {
+    var parsed = Parsed{};
+
+    var next_char_is_specifier = false;
+    var dt_string_idx: usize = 0;
+    for (format) |fc| {
+        if (next_char_is_specifier) {
+            const specifier = try std.meta.intToEnum(Specifier, fc);
+            switch (specifier) {
+                .isoweek_number => {
+                    std.debug.assert(parsed.isoweek == null);
+                    parsed.isoweek = try parseDigits(internals.WeekInt, dtString, &dt_string_idx, 2);
+                },
+                .isoweek_year => {
+                    std.debug.assert(parsed.isoweek_year == null);
+                    parsed.isoweek_year = try parseDigits(internals.YearInt, dtString, &dt_string_idx, 4);
+                },
+
+                .iso_date => {
+                    std.debug.assert(parsed.year == null and parsed.month == null and parsed.day == null);
+                    parsed.year = try parseDigits(internals.YearInt, dtString, &dt_string_idx, 4);
+                    parsed.month = try std.meta.intToEnum(chrono.Month, try parseDigits(internals.MonthInt, dtString, &dt_string_idx, 2));
+                    parsed.day = try parseDigits(internals.DayInt, dtString, &dt_string_idx, 2);
+                },
+
+                .full_year => {
+                    std.debug.assert(parsed.year == null);
+                    // Read digits until: 1) there is four digits or 2) the next character is not a digit
+                    parsed.year = try parseDigits(internals.YearInt, dtString, &dt_string_idx, 4);
+                },
+                .month_number => {
+                    std.debug.assert(parsed.month == null);
+                    // Read 2 digits or just 1 if the digit after is not a digit
+                    parsed.month = try std.meta.intToEnum(
+                        chrono.Month,
+                        try parseDigits(internals.MonthInt, dtString, &dt_string_idx, 2),
+                    );
+                },
+                .day => {
+                    std.debug.assert(parsed.day == null);
+                    // Read 2 digits or just 1 if the digit after is not a digit
+                    parsed.day = try parseDigits(internals.DayInt, dtString, &dt_string_idx, 2);
+                },
+
+                // Time specifiers
+                .hour24 => {
+                    std.debug.assert(parsed.hour == null);
+                    parsed.hour = try parseDigits(time.HoursInt, dtString, &dt_string_idx, 2);
+                },
+                .min => {
+                    std.debug.assert(parsed.minute == null);
+                    parsed.minute = try parseDigits(time.MinutesInt, dtString, &dt_string_idx, 2);
+                },
+                .sec => {
+                    std.debug.assert(parsed.second == null);
+                    parsed.second = try parseDigits(time.SecondsInt, dtString, &dt_string_idx, 2);
+                },
+
+                // Combined time specifiers
+                .hour24_and_min => {
+                    std.debug.assert(parsed.hour == null and parsed.minute == null);
+                    parsed.hour = try parseDigits(time.HoursInt, dtString, &dt_string_idx, 2);
+                    parsed.minute = try parseDigits(time.MinutesInt, dtString, &dt_string_idx, 2);
+                },
+                .iso_time => {
+                    std.debug.assert(parsed.hour == null and parsed.minute == null and parsed.second == null);
+                    parsed.hour = try parseDigits(time.HoursInt, dtString, &dt_string_idx, 2);
+                    parsed.minute = try parseDigits(time.MinutesInt, dtString, &dt_string_idx, 2);
+                    parsed.second = try parseDigits(time.SecondsInt, dtString, &dt_string_idx, 2);
+                },
+
+                .weekday => {
+                    std.debug.assert(parsed.weekday == null);
+                    parsed.weekday = try parseWeekdayShort(dtString, &dt_string_idx);
+                },
+                .full_weekday => {
+                    std.debug.assert(parsed.weekday == null);
+                    parsed.weekday = try parseWeekdayFull(dtString, &dt_string_idx);
+                },
+
+                .month => {
+                    std.debug.assert(parsed.month == null);
+                    parsed.month = try parseMonthShort(dtString, &dt_string_idx);
+                },
+                .full_month => {
+                    std.debug.assert(parsed.month == null);
+                    parsed.month = try parseMonthFull(dtString, &dt_string_idx);
+                },
+            }
+            next_char_is_specifier = false;
+        } else {
+            if (fc == '%') {
+                next_char_is_specifier = true;
+            } else {
+                if (dtString[dt_string_idx] != fc) {
+                    return error.InvalidFormat;
+                }
+                dt_string_idx += 1;
+            }
+        }
+    }
+
+    return parsed;
+}
+
 fn parseDigits(comptime T: type, dtString: []const u8, idx: *usize, maxDigits: usize) !T {
     const start_idx = idx.*;
 
@@ -310,6 +430,74 @@ fn parseDigits(comptime T: type, dtString: []const u8, idx: *usize, maxDigits: u
     while (idx.* < start_idx + maxDigits and std.ascii.isDigit(dtString[idx.*])) : (idx.* += 1) {}
 
     return try std.fmt.parseInt(T, dtString[start_idx..idx.*], 10);
+}
+
+pub fn parseWeekdayShort(dtString: []const u8, idx: *usize) !chrono.Weekday {
+    const start_idx = idx.*;
+    errdefer idx.* = start_idx;
+
+    const str = dtString[idx.*..];
+
+    inline for (chrono.Weekday.WEEKDAYS) |WEEKDAY| {
+        const short_name = WEEKDAY.shortName();
+        if (std.ascii.startsWithIgnoreCase(&short_name, str)) {
+            idx.* += short_name.len;
+            return WEEKDAY;
+        }
+    }
+
+    return error.InvalidFormat;
+}
+
+pub fn parseWeekdayFull(dtString: []const u8, idx: *usize) !chrono.Weekday {
+    const start_idx = idx.*;
+    errdefer idx.* = start_idx;
+
+    const str = dtString[idx.*..];
+
+    inline for (chrono.Weekday.WEEKDAYS) |WEEKDAY| {
+        const full_name = WEEKDAY.fullName();
+        if (std.ascii.startsWithIgnoreCase(full_name, str)) {
+            idx.* += full_name.len;
+            return WEEKDAY;
+        }
+    }
+
+    return error.InvalidFormat;
+}
+
+pub fn parseMonthShort(dtString: []const u8, idx: *usize) !chrono.Month {
+    const start_idx = idx.*;
+    errdefer idx.* = start_idx;
+
+    const str = dtString[idx.*..];
+
+    inline for (chrono.Month.MONTHS) |MONTH| {
+        const short_name = MONTH.shortName();
+        if (std.ascii.startsWithIgnoreCase(&short_name, str)) {
+            idx.* += short_name.len;
+            return MONTH;
+        }
+    }
+
+    return error.InvalidFormat;
+}
+
+pub fn parseMonthFull(dtString: []const u8, idx: *usize) !chrono.Month {
+    const start_idx = idx.*;
+    errdefer idx.* = start_idx;
+
+    const str = dtString[idx.*..];
+
+    inline for (chrono.Month.MONTHS) |MONTH| {
+        const full_name = MONTH.fullName();
+        if (std.ascii.startsWithIgnoreCase(full_name, str)) {
+            idx.* += full_name.len;
+            return MONTH;
+        }
+    }
+
+    return error.InvalidFormat;
 }
 
 test "comptime parse with comptime format string" {
