@@ -18,6 +18,16 @@ pub const Weekday = enum(u3) {
     sat = 5,
     sun = 6,
 
+    pub const WEEKDAYS = [_]Weekday{
+        .mon,
+        .tue,
+        .wed,
+        .thu,
+        .fri,
+        .sat,
+        .sun,
+    };
+
     pub fn fullName(this: @This()) []const u8 {
         return switch (this) {
             .mon => "Monday",
@@ -56,6 +66,21 @@ pub const Month = enum(u4) {
     oct,
     nov,
     dec,
+
+    pub const MONTHS = [_]Month{
+        .jan,
+        .feb,
+        .mar,
+        .apr,
+        .may,
+        .jun,
+        .jul,
+        .aug,
+        .sep,
+        .oct,
+        .nov,
+        .dec,
+    };
 
     pub fn fullName(this: @This()) []const u8 {
         return switch (this) {
