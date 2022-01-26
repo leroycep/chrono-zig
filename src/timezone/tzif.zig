@@ -102,7 +102,8 @@ pub const TimeZone = struct {
     pub fn localTimeToUTC(this: @This(), localtime: i64) ?ConversionResult {
         _ = this;
         _ = localtime;
-        @compileError("Unimplemented");
+        std.debug.panic("Unimplemented", .{});
+        return null;
     }
 };
 
