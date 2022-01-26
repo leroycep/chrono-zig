@@ -1,6 +1,6 @@
 # Zig Chrono
 
 A Zig port of the Rust crate [`chrono`][]. Built with Zig version
-`0.8.0-dev.1028+287f640cc`.
+`0.9.0`.
 
 [`chrono`]: https://github.com/chronotope/chrono
