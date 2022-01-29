@@ -80,12 +80,12 @@ pub const NaiveDate = struct {
         }
     }
 
-    pub fn succ(this: @This()) ?@This() {
+    pub fn succ(this: @This()) !@This() {
         const of = this._of.succ();
         if (!of.valid()) {
             var new_year: YearInt = undefined;
-            if (@addWithOverflow(YearInt, this._year, 1, &new_year)) return null;
-            return yo(new_year, 1) catch return null;
+            if (@addWithOverflow(YearInt, this._year, 1, &new_year)) return error.Overflow;
+            return yo(new_year, 1);
         } else {
             return @This(){
                 ._year = this._year,
@@ -94,12 +94,12 @@ pub const NaiveDate = struct {
         }
     }
 
-    pub fn pred(this: @This()) ?@This() {
+    pub fn pred(this: @This()) !@This() {
         const of = this._of.pred();
         if (!of.valid()) {
             var new_year: YearInt = undefined;
-            if (@subWithOverflow(YearInt, this._year, 1, &new_year)) return null;
-            return ymd(new_year, 12, 31) catch return null;
+            if (@subWithOverflow(YearInt, this._year, 1, &new_year)) return error.Overflow;
+            return ymd(new_year, 12, 31);
         } else {
             return @This(){
                 ._year = this._year,
@@ -108,8 +108,8 @@ pub const NaiveDate = struct {
         }
     }
 
-    pub fn hms(this: @This(), hour: u32, minute: u32, second: u32) ?NaiveDateTime {
-        const time = NaiveTime.hms(hour, minute, second) orelse return null;
+    pub fn hms(this: @This(), hour: u32, minute: u32, second: u32) !NaiveDateTime {
+        const time = try NaiveTime.hms(hour, minute, second);
         return NaiveDateTime.new(this, time);
     }
 
@@ -238,20 +238,20 @@ test "date from isoywd" {
 
 test "date successor" {
     const ymd = NaiveDate.ymd;
-    try std.testing.expectEqual((try ymd(2014, 5, 7)), (try ymd(2014, 5, 6)).succ().?);
-    try std.testing.expectEqual((try ymd(2014, 6, 1)), (try ymd(2014, 5, 31)).succ().?);
-    try std.testing.expectEqual((try ymd(2015, 1, 1)), (try ymd(2014, 12, 31)).succ().?);
-    try std.testing.expectEqual((try ymd(2016, 2, 29)), (try ymd(2016, 2, 28)).succ().?);
-    try std.testing.expectEqual(@as(?NaiveDate, null), (try ymd(MAX_YEAR, 12, 31)).succ());
+    try std.testing.expectEqual((try ymd(2014, 5, 7)), try (try ymd(2014, 5, 6)).succ());
+    try std.testing.expectEqual((try ymd(2014, 6, 1)), try (try ymd(2014, 5, 31)).succ());
+    try std.testing.expectEqual((try ymd(2015, 1, 1)), try (try ymd(2014, 12, 31)).succ());
+    try std.testing.expectEqual((try ymd(2016, 2, 29)), try (try ymd(2016, 2, 28)).succ());
+    try std.testing.expectError(error.Overflow, (try ymd(MAX_YEAR, 12, 31)).succ());
 }
 
 test "date predecessor" {
     const ymd = NaiveDate.ymd;
-    try std.testing.expectEqual((try ymd(2016, 2, 29)), (try ymd(2016, 3, 1)).pred().?);
-    try std.testing.expectEqual((try ymd(2014, 12, 31)), (try ymd(2015, 1, 1)).pred().?);
-    try std.testing.expectEqual((try ymd(2014, 5, 31)), (try ymd(2014, 6, 1)).pred().?);
-    try std.testing.expectEqual((try ymd(2014, 5, 6)), (try ymd(2014, 5, 7)).pred().?);
-    try std.testing.expectEqual(@as(?NaiveDate, null), (try ymd(MIN_YEAR, 1, 1)).pred());
+    try std.testing.expectEqual((try ymd(2016, 2, 29)), try (try ymd(2016, 3, 1)).pred());
+    try std.testing.expectEqual((try ymd(2014, 12, 31)), try (try ymd(2015, 1, 1)).pred());
+    try std.testing.expectEqual((try ymd(2014, 5, 31)), try (try ymd(2014, 6, 1)).pred());
+    try std.testing.expectEqual((try ymd(2014, 5, 6)), try (try ymd(2014, 5, 7)).pred());
+    try std.testing.expectError(error.Overflow, (try ymd(MIN_YEAR, 1, 1)).pred());
 }
 
 test "date signed duration since" {

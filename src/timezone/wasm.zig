@@ -13,7 +13,7 @@ pub fn utcToLocal(timestamp: i64) i64 {
 pub fn localToUtc(timestamp: i64) i64 {
     var str_buf: [100]u8 = undefined;
 
-    const datetime = NaiveDateTime.from_timestamp(timestamp, 0).?;
+    const datetime = NaiveDateTime.from_timestamp(timestamp, 0) catch unreachable;
     const str = std.fmt.bufPrint(&str_buf, "{}", .{datetime.formatted("%Y-%m-%dT%H:%M:%S")}) catch unreachable;
 
     return datetimeStrToUTCTimestamp(str.ptr, str.len);
