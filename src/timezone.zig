@@ -68,6 +68,7 @@ pub const Fixed = struct {
 pub const TZif = struct {
     timezone: TimeZone = .{
         .utcToLocalFn = utcToLocal,
+        .timezoneToUtcFn = timezoneToUtc,
     },
     tzif: tzif.TimeZone,
 
@@ -88,18 +89,34 @@ pub const TZif = struct {
         };
         return conversion.timestamp;
     }
+
+    fn timezoneToUtc(timezone: *const TimeZone, timestamp: i64) i64 {
+        const this = @fieldParentPtr(@This(), "timezone", timezone);
+        const conversion = this.tzif.localTimeToUTC(timestamp) orelse {
+            std.debug.panic("TZif file does not specify TimeZone", .{});
+        };
+        return conversion.timestamp;
+    }
 };
 
 pub const Posix = struct {
     timezone: TimeZone = .{
         .utcToLocalFn = utcToLocal,
+        .timezoneToUtcFn = timezoneToUtc,
     },
+
     tz: posix.TZ,
 
     fn utcToLocal(timezone: *const TimeZone, timestamp: i64) i64 {
         const this = @fieldParentPtr(@This(), "timezone", timezone);
         const offset_res = this.tz.offset(timestamp);
         return timestamp + offset_res.offset;
+    }
+
+    fn timezoneToUtc(timezone: *const TimeZone, timestamp: i64) i64 {
+        const this = @fieldParentPtr(@This(), "timezone", timezone);
+        const offset_res = this.tz.offset(timestamp);
+        return timestamp - offset_res.offset;
     }
 };
 
