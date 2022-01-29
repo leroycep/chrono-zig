@@ -174,8 +174,8 @@ test "format naive datetimes with parts api" {
     };
 
     const cases = [_]Case{
-        .{ .datetime = NaiveDate.ymd(2021, 02, 18).?.hms(17, 00, 00).?, .expected_string = "2021-02-18 17:00:00" },
-        .{ .datetime = NaiveDate.ymd(1970, 01, 01).?.hms(0, 0, 0).?, .expected_string = "1970-01-01 00:00:00" },
+        .{ .datetime = try NaiveDateTime.ymd_hms(2021, 02, 18, 17, 00, 00), .expected_string = "2021-02-18 17:00:00" },
+        .{ .datetime = try NaiveDateTime.ymd_hms(1970, 01, 01, 0, 0, 0), .expected_string = "1970-01-01 00:00:00" },
     };
 
     const parts = try parseFormatAlloc(std.testing.allocator, "%Y-%m-%d %H:%M:%S");
@@ -198,8 +198,8 @@ test "format naive datetimes with format string api" {
     };
 
     const cases = [_]Case{
-        .{ .datetime = NaiveDate.ymd(2021, 02, 18).?.hms(17, 00, 00).?, .expected_string = "2021-02-18 17:00:00" },
-        .{ .datetime = NaiveDate.ymd(1970, 01, 01).?.hms(0, 0, 0).?, .expected_string = "1970-01-01 00:00:00" },
+        .{ .datetime = try NaiveDateTime.ymd_hms(2021, 02, 18, 17, 00, 00), .expected_string = "2021-02-18 17:00:00" },
+        .{ .datetime = try NaiveDateTime.ymd_hms(1970, 01, 01, 0, 0, 0), .expected_string = "1970-01-01 00:00:00" },
     };
 
     for (cases) |case| {
@@ -299,7 +299,7 @@ pub fn parseNaiveDateTime(comptime format: []const u8, dtString: []const u8) !Na
     std.debug.assert(hour != null);
     std.debug.assert(minute != null);
 
-    return NaiveDate.ymd(year.?, month.?, day.?).?.hms(hour.?, minute.?, second orelse 0).?;
+    return NaiveDateTime.ymd_hms(year.?, month.?, day.?, hour.?, minute.?, second orelse 0);
 }
 
 pub const Parsed = struct {
@@ -507,8 +507,8 @@ test "comptime parse with comptime format string" {
     };
 
     const cases = [_]Case{
-        .{ .string = "2021-02-18 17:00:00", .expected_datetime = NaiveDate.ymd(2021, 02, 18).?.hms(17, 00, 00).? },
-        .{ .string = "1970-01-01 00:00:00", .expected_datetime = NaiveDate.ymd(1970, 01, 01).?.hms(0, 0, 0).? },
+        .{ .string = "2021-02-18 17:00:00", .expected_datetime = try NaiveDateTime.ymd_hms(2021, 02, 18, 17, 00, 00) },
+        .{ .string = "1970-01-01 00:00:00", .expected_datetime = try NaiveDateTime.ymd_hms(1970, 01, 01, 0, 0, 0) },
     };
 
     for (cases) |case| {

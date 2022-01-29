@@ -49,13 +49,13 @@ pub const NaiveTime = struct {
     secs: SecsInt,
     frac: FracInt,
 
-    pub fn hms(hr: u32, min: u32, sec: u32) ?@This() {
+    pub fn hms(hr: u32, min: u32, sec: u32) !@This() {
         return hms_nano(hr, min, sec, 0);
     }
 
-    pub fn hms_nano(hr: u32, min: u32, sec: u32, nano: u32) ?@This() {
+    pub fn hms_nano(hr: u32, min: u32, sec: u32, nano: u32) !@This() {
         if (hr >= MAX_HOURS or min >= min_per_hour or sec >= std.time.s_per_min or nano >= MAX_FRAC) {
-            return null;
+            return error.InvalidTime;
         }
         return NaiveTime{
             .secs = @intCast(SecsInt, hr * std.time.s_per_hour + min * std.time.s_per_min + sec),
@@ -69,9 +69,9 @@ pub const NaiveTime = struct {
         return @intCast(HoursInt, hr);
     }
 
-    pub fn with_hour(this: @This(), hr: HoursInt) ?@This() {
+    pub fn with_hour(this: @This(), hr: HoursInt) !@This() {
         if (hr >= MAX_HOURS) {
-            return null;
+            return error.InvalidTime;
         }
         const secs = @intCast(u32, hr) * s_per_hour + @intCast(u32, this.secs) % s_per_hour;
         return @This(){
@@ -86,9 +86,9 @@ pub const NaiveTime = struct {
         return @intCast(MinutesInt, min);
     }
 
-    pub fn with_minute(this: @This(), min: MinutesInt) ?@This() {
+    pub fn with_minute(this: @This(), min: MinutesInt) !@This() {
         if (min >= min_per_hour) {
-            return null;
+            return error.InvalidTime;
         }
         const secs = (@intCast(u32, this.secs) / s_per_hour * s_per_hour) + (@intCast(u32, min) * s_per_min) + (this.secs % s_per_min);
         return @This(){
@@ -101,9 +101,9 @@ pub const NaiveTime = struct {
         return @intCast(SecondsInt, this.secs % (s_per_min));
     }
 
-    pub fn with_second(this: @This(), sec: SecondsInt) ?@This() {
+    pub fn with_second(this: @This(), sec: SecondsInt) !@This() {
         if (sec >= s_per_min) {
-            return null;
+            return error.InvalidTime;
         }
         const secs = @intCast(u32, this.secs) / s_per_min * s_per_min + sec;
         return @This(){
@@ -112,9 +112,9 @@ pub const NaiveTime = struct {
         };
     }
 
-    pub fn from_num_seconds_from_midnight(secs: u32, nano: u32) ?@This() {
+    pub fn from_num_seconds_from_midnight(secs: u32, nano: u32) !@This() {
         if (secs >= std.time.s_per_day or nano >= MAX_FRAC) {
-            return null;
+            return error.InvalidTime;
         }
         return @This(){ .secs = @intCast(SecsInt, secs), .frac = @intCast(FracInt, nano) };
     }
@@ -145,27 +145,27 @@ pub const NaiveTime = struct {
 };
 
 test "time hour, minute, second" {
-    try std.testing.expectEqual(@as(HoursInt, 3), NaiveTime.hms(3, 5, 7).?.hour());
-    try std.testing.expectEqual(NaiveTime.hms(0, 5, 7), NaiveTime.hms(3, 5, 7).?.with_hour(0));
-    try std.testing.expectEqual(NaiveTime.hms(23, 5, 7), NaiveTime.hms(3, 5, 7).?.with_hour(23));
-    try std.testing.expectEqual(@as(?NaiveTime, null), NaiveTime.hms(3, 5, 7).?.with_hour(24));
-    try std.testing.expectEqual(@as(?NaiveTime, null), NaiveTime.hms(3, 5, 7).?.with_hour(std.math.maxInt(HoursInt)));
+    try std.testing.expectEqual(@as(HoursInt, 3), (try NaiveTime.hms(3, 5, 7)).hour());
+    try std.testing.expectEqual((try NaiveTime.hms(0, 5, 7)), (try (try NaiveTime.hms(3, 5, 7)).with_hour(0)));
+    try std.testing.expectEqual((try NaiveTime.hms(23, 5, 7)), (try (try NaiveTime.hms(3, 5, 7)).with_hour(23)));
+    try std.testing.expectError(error.InvalidTime, (try NaiveTime.hms(3, 5, 7)).with_hour(24));
+    try std.testing.expectError(error.InvalidTime, (try NaiveTime.hms(3, 5, 7)).with_hour(std.math.maxInt(HoursInt)));
 
-    try std.testing.expectEqual(@as(MinutesInt, 5), NaiveTime.hms(3, 5, 7).?.minute());
-    try std.testing.expectEqual(NaiveTime.hms(3, 0, 7), NaiveTime.hms(3, 5, 7).?.with_minute(0));
-    try std.testing.expectEqual(NaiveTime.hms(3, 59, 7), NaiveTime.hms(3, 5, 7).?.with_minute(59));
-    try std.testing.expectEqual(@as(?NaiveTime, null), NaiveTime.hms(3, 5, 7).?.with_minute(60));
-    try std.testing.expectEqual(@as(?NaiveTime, null), NaiveTime.hms(3, 5, 7).?.with_minute(std.math.maxInt(MinutesInt)));
+    try std.testing.expectEqual(@as(MinutesInt, 5), (try NaiveTime.hms(3, 5, 7)).minute());
+    try std.testing.expectEqual((try NaiveTime.hms(3, 0, 7)), try (try NaiveTime.hms(3, 5, 7)).with_minute(0));
+    try std.testing.expectEqual((try NaiveTime.hms(3, 59, 7)), try (try NaiveTime.hms(3, 5, 7)).with_minute(59));
+    try std.testing.expectError(error.InvalidTime, (try NaiveTime.hms(3, 5, 7)).with_minute(60));
+    try std.testing.expectError(error.InvalidTime, (try NaiveTime.hms(3, 5, 7)).with_minute(std.math.maxInt(MinutesInt)));
 
-    try std.testing.expectEqual(@as(MinutesInt, 7), NaiveTime.hms(3, 5, 7).?.second());
-    try std.testing.expectEqual(NaiveTime.hms(3, 5, 0), NaiveTime.hms(3, 5, 7).?.with_second(0));
-    try std.testing.expectEqual(NaiveTime.hms(3, 5, 59), NaiveTime.hms(3, 5, 7).?.with_second(59));
-    try std.testing.expectEqual(@as(?NaiveTime, null), NaiveTime.hms(3, 5, 7).?.with_second(60));
-    try std.testing.expectEqual(@as(?NaiveTime, null), NaiveTime.hms(3, 5, 7).?.with_second(std.math.maxInt(MinutesInt)));
+    try std.testing.expectEqual(@as(MinutesInt, 7), (try NaiveTime.hms(3, 5, 7)).second());
+    try std.testing.expectEqual((try NaiveTime.hms(3, 5, 0)), try (try NaiveTime.hms(3, 5, 7)).with_second(0));
+    try std.testing.expectEqual((try NaiveTime.hms(3, 5, 59)), try (try NaiveTime.hms(3, 5, 7)).with_second(59));
+    try std.testing.expectError(error.InvalidTime, (try NaiveTime.hms(3, 5, 7)).with_second(60));
+    try std.testing.expectError(error.InvalidTime, (try NaiveTime.hms(3, 5, 7)).with_second(std.math.maxInt(MinutesInt)));
 }
 
 test "time signed duration since" {
     const hms = NaiveTime.hms;
-    try std.testing.expectEqual(@as(i64, 3600), hms(23, 0, 0).?.signed_duration_since(hms(22, 0, 0).?));
-    try std.testing.expectEqual(@as(i64, 79_200), hms(22, 0, 0).?.signed_duration_since(hms(0, 0, 0).?));
+    try std.testing.expectEqual(@as(i64, 3600), (try hms(23, 0, 0)).signed_duration_since((try hms(22, 0, 0))));
+    try std.testing.expectEqual(@as(i64, 79_200), (try hms(22, 0, 0)).signed_duration_since((try hms(0, 0, 0))));
 }
