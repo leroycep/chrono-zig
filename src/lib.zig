@@ -9,6 +9,14 @@ pub const duration = @import("./duration.zig");
 
 pub const IsoWeek = @import("./IsoWeek.zig");
 
+pub const NaiveDate = date.NaiveDate;
+pub const NaiveTime = time.NaiveTime;
+pub const NaiveDateTime = datetime.NaiveDateTime;
+
+pub const DateTime = datetime.DateTime;
+
+pub const EPOCH = NaiveDateTime.ymd_hms(1970, 01, 01, 0, 0, 0) catch unreachable;
+
 pub const Weekday = enum(u3) {
     mon = 0,
     tue = 1,
