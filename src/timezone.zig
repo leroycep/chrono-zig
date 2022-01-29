@@ -150,8 +150,15 @@ test "" {
 }
 
 test "Load TZif file" {
-    const utc = try TZif.load(std.testing.allocator, "src/timezone/zoneinfo/UTC");
+    const utc = TZif.load(std.testing.allocator, "src/timezone/zoneinfo/UTC") catch |err| switch (err) {
+        error.FileNotFound => return error.SkipZigTest,
+        else => |e| return e,
+    };
     defer utc.deinit();
-    const honolulu = try TZif.load(std.testing.allocator, "src/timezone/zoneinfo/Pacific/Honolulu");
+
+    const honolulu = TZif.load(std.testing.allocator, "src/timezone/zoneinfo/Pacific/Honolulu") catch |err| switch (err) {
+        error.FileNotFound => return error.SkipZigTest,
+        else => |e| return e,
+    };
     defer honolulu.deinit();
 }
