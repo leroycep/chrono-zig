@@ -29,11 +29,11 @@ pub const DateTime = struct {
         return .{ .datetime = datetime, .timezone = tz };
     }
 
-    pub fn local(localDatetime: NaiveDateTime, tz: *const TimeZone) @This() {
+    pub fn local(localDatetime: NaiveDateTime, tz: *const TimeZone) !@This() {
         const timezone_timestamp = localDatetime.signed_duration_since(EPOCH);
         const timestamp = tz.timezoneToUtc(timezone_timestamp);
-        return .{
-            .datetime = NaiveDateTime.from_timestamp(timestamp, 0).?,
+        return @This(){
+            .datetime = try NaiveDateTime.from_timestamp(timestamp, 0),
             .timezone = tz,
         };
     }
