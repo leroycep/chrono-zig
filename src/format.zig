@@ -174,8 +174,8 @@ test "format naive datetimes with parts api" {
     };
 
     const cases = [_]Case{
-        .{ .datetime = try NaiveDateTime.ymd_hms(2021, 02, 18, 17, 00, 00), .expected_string = "2021-02-18 17:00:00" },
-        .{ .datetime = try NaiveDateTime.ymd_hms(1970, 01, 01, 0, 0, 0), .expected_string = "1970-01-01 00:00:00" },
+        .{ .datetime = try NaiveDateTime.ymd_hms(2021, 2, 18, 17, 0, 0), .expected_string = "2021-02-18 17:00:00" },
+        .{ .datetime = try NaiveDateTime.ymd_hms(1970, 1, 1, 0, 0, 0), .expected_string = "1970-01-01 00:00:00" },
     };
 
     const parts = try parseFormatAlloc(std.testing.allocator, "%Y-%m-%d %H:%M:%S");
@@ -198,8 +198,8 @@ test "format naive datetimes with format string api" {
     };
 
     const cases = [_]Case{
-        .{ .datetime = try NaiveDateTime.ymd_hms(2021, 02, 18, 17, 00, 00), .expected_string = "2021-02-18 17:00:00" },
-        .{ .datetime = try NaiveDateTime.ymd_hms(1970, 01, 01, 0, 0, 0), .expected_string = "1970-01-01 00:00:00" },
+        .{ .datetime = try NaiveDateTime.ymd_hms(2021, 2, 18, 17, 0, 0), .expected_string = "2021-02-18 17:00:00" },
+        .{ .datetime = try NaiveDateTime.ymd_hms(1970, 1, 1, 0, 0, 0), .expected_string = "1970-01-01 00:00:00" },
     };
 
     for (cases) |case| {
@@ -507,8 +507,8 @@ test "comptime parse with comptime format string" {
     };
 
     const cases = [_]Case{
-        .{ .string = "2021-02-18 17:00:00", .expected_datetime = try NaiveDateTime.ymd_hms(2021, 02, 18, 17, 00, 00) },
-        .{ .string = "1970-01-01 00:00:00", .expected_datetime = try NaiveDateTime.ymd_hms(1970, 01, 01, 0, 0, 0) },
+        .{ .string = "2021-02-18 17:00:00", .expected_datetime = try NaiveDateTime.ymd_hms(2021, 2, 18, 17, 0, 0) },
+        .{ .string = "1970-01-01 00:00:00", .expected_datetime = try NaiveDateTime.ymd_hms(1970, 1, 1, 0, 0, 0) },
     };
 
     for (cases) |case| {

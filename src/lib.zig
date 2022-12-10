@@ -15,7 +15,7 @@ pub const NaiveDateTime = datetime.NaiveDateTime;
 
 pub const DateTime = datetime.DateTime;
 
-pub const EPOCH = NaiveDateTime.ymd_hms(1970, 01, 01, 0, 0, 0) catch unreachable;
+pub const EPOCH = NaiveDateTime.ymd_hms(1970, 1, 1, 0, 0, 0) catch unreachable;
 
 pub const Weekday = enum(u3) {
     mon = 0,

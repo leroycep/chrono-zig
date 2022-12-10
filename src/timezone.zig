@@ -145,7 +145,7 @@ const LocalTimeZone = switch (builtin.os.tag) {
     else => @compileError("Platform not supported"),
 };
 
-test "" {
+comptime {
     @import("std").testing.refAllDecls(@This());
 }
 

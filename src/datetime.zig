@@ -189,7 +189,7 @@ test "Pacific/Honolulu datetime from timestamp" {
     };
 
     const cases = [_]Case{
-        .{ .timestamp = 1613703600, .local_time = try NaiveDateTime.ymd_hms(2021, 02, 18, 17, 00, 00) },
+        .{ .timestamp = 1613703600, .local_time = try NaiveDateTime.ymd_hms(2021, 2, 18, 17, 0, 0) },
     };
 
     for (cases) |case| {
@@ -201,13 +201,13 @@ test "Pacific/Honolulu datetime from timestamp" {
 test "naive datetime .formatted()" {
     var a = std.testing.allocator;
     {
-        const str = try std.fmt.allocPrint(a, "{}", .{(try NaiveDateTime.ymd_hms(2021, 02, 18, 17, 00, 00)).formatted("%Y-%m-%d %H:%M:%S")});
+        const str = try std.fmt.allocPrint(a, "{}", .{(try NaiveDateTime.ymd_hms(2021, 2, 18, 17, 0, 0)).formatted("%Y-%m-%d %H:%M:%S")});
         defer a.free(str);
-        try std.testing.expectEqualSlices(u8, "2021-02-18 17:00:00", str);
+        try std.testing.expectEqualSlices(u8, "2021-2-18 17:0:0", str);
     }
     {
-        const str = try std.fmt.allocPrint(a, "{%F %T}", .{(try NaiveDateTime.ymd_hms(2021, 02, 18, 17, 00, 00))});
+        const str = try std.fmt.allocPrint(a, "{%F %T}", .{(try NaiveDateTime.ymd_hms(2021, 2, 18, 17, 0, 0))});
         defer a.free(str);
-        try std.testing.expectEqualStrings("2021-02-18 17:00:00", str);
+        try std.testing.expectEqualStrings("2021-2-18 17:0:0", str);
     }
 }
