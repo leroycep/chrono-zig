@@ -26,7 +26,7 @@ pub const NaiveDate = struct {
     pub fn from_of(year_param: i32, of: Of) DateError!@This() {
         if (MIN_YEAR <= year_param and year_param <= MAX_YEAR and of.valid()) {
             return @This(){
-                ._year = @intCast(YearInt, year_param),
+                ._year = @as(YearInt, @intCast(year_param)),
                 ._of = of,
             };
         } else {
@@ -51,7 +51,7 @@ pub const NaiveDate = struct {
         const flags = YearFlags.from_year(yearNum);
         const nweeks = flags.nisoweeks();
         if (1 <= week and week <= nweeks) {
-            const weekord = week * 7 + @enumToInt(weekdayParam);
+            const weekord = week * 7 + @intFromEnum(weekdayParam);
             const delta = flags.isoweek_delta();
             if (weekord <= delta) {
                 const prevflags = YearFlags.from_year(yearNum - 1);
@@ -84,7 +84,9 @@ pub const NaiveDate = struct {
         const of = this._of.succ();
         if (!of.valid()) {
             var new_year: YearInt = undefined;
-            if (@addWithOverflow(YearInt, this._year, 1, &new_year)) return error.Overflow;
+            const addition = @addWithOverflow(this._year, 1);
+            if (addition[1] > 0) return error.Overflow;
+            new_year = addition[0];
             return yo(new_year, 1);
         } else {
             return @This(){
@@ -98,7 +100,9 @@ pub const NaiveDate = struct {
         const of = this._of.pred();
         if (!of.valid()) {
             var new_year: YearInt = undefined;
-            if (@subWithOverflow(YearInt, this._year, 1, &new_year)) return error.Overflow;
+            const subtraction = @subWithOverflow(this._year, 1);
+            if (subtraction[1] > 0) return error.Overflow;
+            new_year = subtraction[0];
             return ymd(new_year, 12, 31);
         } else {
             return @This(){
@@ -121,10 +125,10 @@ pub const NaiveDate = struct {
         const year_div_400 = @divFloor(days_1bce, DAYS_IN_400_YEARS);
         const cycle = @mod(days_1bce, DAYS_IN_400_YEARS);
 
-        const res = internals.cycle_to_yo(@intCast(u32, cycle));
+        const res = internals.cycle_to_yo(@as(u32, @intCast(cycle)));
         const flags = YearFlags.from_year_mod_400(res.year_mod_400);
 
-        return NaiveDate.from_of(year_div_400 * 400 + @intCast(i32, res.year_mod_400), Of.new(res.ordinal, flags));
+        return NaiveDate.from_of(year_div_400 * 400 + @as(i32, @intCast(res.year_mod_400)), Of.new(res.ordinal, flags));
     }
 
     pub fn year(this: @This()) YearInt {
@@ -132,7 +136,7 @@ pub const NaiveDate = struct {
     }
 
     pub fn month(this: @This()) Month {
-        return @intToEnum(Month, this._of.to_mdf().month);
+        return @as(Month, @enumFromInt(this._of.to_mdf().month));
     }
 
     pub fn day(this: @This()) internals.DayInt {
@@ -145,19 +149,19 @@ pub const NaiveDate = struct {
 
     pub fn weekday(this: @This()) Weekday {
         const weekord = this._of.ordinal +% this._of.year_flags.isoweek_delta();
-        return @intToEnum(Weekday, @intCast(u3, weekord % 7));
+        return @as(Weekday, @enumFromInt(@as(u3, @intCast(weekord % 7))));
     }
 
     pub fn signed_duration_since(this: @This(), other: @This()) i64 {
         const year1 = this.year();
-        const year1_div_400 = @intCast(i64, @divFloor(year1, 400));
+        const year1_div_400 = @as(i64, @intCast(@divFloor(year1, 400)));
         const year1_mod_400 = @mod(year1, 400);
-        const cycle1 = @intCast(i64, internals.yo_to_cycle(@intCast(u32, year1_mod_400), this._of.ordinal));
+        const cycle1 = @as(i64, @intCast(internals.yo_to_cycle(@as(u32, @intCast(year1_mod_400)), this._of.ordinal)));
 
         const year2 = other.year();
-        const year2_div_400 = @intCast(i64, @divFloor(year2, 400));
+        const year2_div_400 = @as(i64, @intCast(@divFloor(year2, 400)));
         const year2_mod_400 = @mod(year2, 400);
-        const cycle2 = @intCast(i64, internals.yo_to_cycle(@intCast(u32, year2_mod_400), other._of.ordinal));
+        const cycle2 = @as(i64, @intCast(internals.yo_to_cycle(@as(u32, @intCast(year2_mod_400)), other._of.ordinal)));
 
         return ((year1_div_400 - year2_div_400) * DAYS_IN_400_YEARS + (cycle1 - cycle2)) * std.time.s_per_day;
     }

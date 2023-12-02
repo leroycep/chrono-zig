@@ -125,7 +125,7 @@ pub const Month = enum(u4) {
     }
 
     pub fn number(this: @This()) u4 {
-        return @enumToInt(this);
+        return @intFromEnum(this);
     }
 };
 

@@ -52,7 +52,7 @@ pub const Specifier = enum(u8) {
             .isoweek_year => if (dt.isoweek().year < 0) {
                 try writer.print("{d:0>4}", .{dt.isoweek().year});
             } else {
-                try writer.print("{d:0>4}", .{@intCast(u64, dt.isoweek().year)});
+                try writer.print("{d:0>4}", .{@as(u64, @intCast(dt.isoweek().year))});
             },
             .isoweek_number => try writer.print("{d:0>2}", .{dt.isoweek().week}),
 

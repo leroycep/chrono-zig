@@ -72,7 +72,7 @@ pub const TimeZone = struct {
             const local_time_type = this.localTimeTypes[transition_type];
 
             var designation = this.designations[local_time_type.idx .. this.designations.len - 1];
-            for (designation) |c, i| {
+            for (designation, 0..) |c, i| {
                 if (c == 0) {
                     designation = designation[0..i];
                     break;

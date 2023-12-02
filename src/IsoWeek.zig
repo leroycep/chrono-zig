@@ -27,7 +27,7 @@ pub fn from_yof(year: YearInt, of: internals.Of) @This() {
         } else {
             return @This(){
                 .year = year,
-                .week = @intCast(WeekInt, raw_week),
+                .week = @as(WeekInt, @intCast(raw_week)),
             };
         }
     }

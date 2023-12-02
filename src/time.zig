@@ -58,24 +58,24 @@ pub const NaiveTime = struct {
             return error.InvalidTime;
         }
         return NaiveTime{
-            .secs = @intCast(SecsInt, hr * std.time.s_per_hour + min * std.time.s_per_min + sec),
-            .frac = @intCast(FracInt, nano),
+            .secs = @as(SecsInt, @intCast(hr * std.time.s_per_hour + min * std.time.s_per_min + sec)),
+            .frac = @as(FracInt, @intCast(nano)),
         };
     }
 
     pub fn hour(this: @This()) HoursInt {
         const mins = this.secs / std.time.s_per_min;
         const hr = mins / min_per_hour;
-        return @intCast(HoursInt, hr);
+        return @as(HoursInt, @intCast(hr));
     }
 
     pub fn with_hour(this: @This(), hr: HoursInt) !@This() {
         if (hr >= MAX_HOURS) {
             return error.InvalidTime;
         }
-        const secs = @intCast(u32, hr) * s_per_hour + @intCast(u32, this.secs) % s_per_hour;
+        const secs = @as(u32, @intCast(hr)) * s_per_hour + @as(u32, @intCast(this.secs)) % s_per_hour;
         return @This(){
-            .secs = @intCast(SecsInt, secs),
+            .secs = @as(SecsInt, @intCast(secs)),
             .frac = this.frac,
         };
     }
@@ -83,31 +83,31 @@ pub const NaiveTime = struct {
     pub fn minute(this: @This()) MinutesInt {
         const mins = this.secs / std.time.s_per_min;
         const min = mins % min_per_hour;
-        return @intCast(MinutesInt, min);
+        return @as(MinutesInt, @intCast(min));
     }
 
     pub fn with_minute(this: @This(), min: MinutesInt) !@This() {
         if (min >= min_per_hour) {
             return error.InvalidTime;
         }
-        const secs = (@intCast(u32, this.secs) / s_per_hour * s_per_hour) + (@intCast(u32, min) * s_per_min) + (this.secs % s_per_min);
+        const secs = (@as(u32, @intCast(this.secs)) / s_per_hour * s_per_hour) + (@as(u32, @intCast(min)) * s_per_min) + (this.secs % s_per_min);
         return @This(){
-            .secs = @intCast(SecsInt, secs),
+            .secs = @as(SecsInt, @intCast(secs)),
             .frac = this.frac,
         };
     }
 
     pub fn second(this: @This()) SecondsInt {
-        return @intCast(SecondsInt, this.secs % (s_per_min));
+        return @as(SecondsInt, @intCast(this.secs % (s_per_min)));
     }
 
     pub fn with_second(this: @This(), sec: SecondsInt) !@This() {
         if (sec >= s_per_min) {
             return error.InvalidTime;
         }
-        const secs = @intCast(u32, this.secs) / s_per_min * s_per_min + sec;
+        const secs = @as(u32, @intCast(this.secs)) / s_per_min * s_per_min + sec;
         return @This(){
-            .secs = @intCast(SecsInt, secs),
+            .secs = @as(SecsInt, @intCast(secs)),
             .frac = this.frac,
         };
     }
@@ -116,11 +116,11 @@ pub const NaiveTime = struct {
         if (secs >= std.time.s_per_day or nano >= MAX_FRAC) {
             return error.InvalidTime;
         }
-        return @This(){ .secs = @intCast(SecsInt, secs), .frac = @intCast(FracInt, nano) };
+        return @This(){ .secs = @as(SecsInt, @intCast(secs)), .frac = @as(FracInt, @intCast(nano)) };
     }
 
     pub fn signed_duration_since(this: @This(), other: @This()) i64 {
-        const secs = @intCast(i64, this.secs) - @intCast(i64, other.secs);
+        const secs = @as(i64, @intCast(this.secs)) - @as(i64, @intCast(other.secs));
         // TODO: Return some kind of duration that includes nanoseconds
         //const frac = @intCast(i64, this.frac) - @intCast(i64, other.frac);
 

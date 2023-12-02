@@ -64,14 +64,16 @@ pub const NaiveDateTime = struct {
         if (std.math.minInt(i32) > days or days > std.math.maxInt(i32)) {
             return error.InvalidDate;
         }
-        var days_abs = @intCast(i32, days);
-        if (@addWithOverflow(i32, days_abs, DAYS_AFTER_ZERO_EPOCH, &days_abs)) {
+        var days_abs = @as(i32, @intCast(days));
+        const addition = @addWithOverflow(days_abs, DAYS_AFTER_ZERO_EPOCH);
+        if (addition[1] > 0) {
             return error.InvalidDate;
         }
+        days_abs = addition[0];
 
         const date = try NaiveDate.from_num_days_from_ce(days_abs);
 
-        const time = try NaiveTime.from_num_seconds_from_midnight(@intCast(u32, secs), nsecs);
+        const time = try NaiveTime.from_num_seconds_from_midnight(@as(u32, @intCast(secs)), nsecs);
 
         return @This(){
             .date = date,

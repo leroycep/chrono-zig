@@ -147,7 +147,7 @@ pub const YearFlags = packed struct {
     };
 
     pub fn from_year(year: i32) YearFlags {
-        return from_year_mod_400(@intCast(usize, @mod(year, 400)));
+        return from_year_mod_400(@as(usize, @intCast(@mod(year, 400))));
     }
 
     pub fn from_year_mod_400(year: usize) YearFlags {
@@ -159,7 +159,7 @@ pub const YearFlags = packed struct {
     }
 
     pub fn nisoweeks(this: @This()) WeekInt {
-        return 52 + @intCast(WeekInt, (@as(u32, 0b0000_0100_0000_0110) >> this.flags) & 1);
+        return 52 + @as(WeekInt, @intCast((@as(u32, 0b0000_0100_0000_0110) >> this.flags) & 1));
     }
 
     pub fn isoweek_delta(this: @This()) u32 {
@@ -384,7 +384,7 @@ pub const Of = struct {
         if (ordinal > 366) {
             return 0;
         } else {
-            return @intCast(OrdinalInt, ordinal);
+            return @as(OrdinalInt, @intCast(ordinal));
         }
     }
 
@@ -401,9 +401,9 @@ pub const Of = struct {
         // TODO: figure out if MDL_TO_OL is supposed to be checked to negative values
         if (mdl < MDL_TO_OL.len and MDL_TO_OL[mdl] > 0) {
             var ord = mdl;
-            ord -%= @as(u11, @bitCast(u8, MDL_TO_OL[mdl])) & 0x3ff;
+            ord -%= @as(u11, @as(u8, @bitCast(MDL_TO_OL[mdl]))) & 0x3ff;
             return Of{
-                .ordinal = @intCast(OrdinalInt, ord >> 1),
+                .ordinal = @as(OrdinalInt, @intCast(ord >> 1)),
                 .year_flags = mdf.year_flags,
             };
         } else {
@@ -413,7 +413,7 @@ pub const Of = struct {
 
     // TODO: Use bit cast when packed structs are stable
     pub fn to_bits(this: @This()) u13 {
-        return (@intCast(u13, this.ordinal) << 4) | (this.year_flags.flags);
+        return (@as(u13, @intCast(this.ordinal)) << 4) | (this.year_flags.flags);
     }
 
     pub fn valid(this: @This()) bool {
@@ -480,7 +480,7 @@ pub const Mdf = struct {
         if (month > 12) {
             return 0;
         } else {
-            return @intCast(MonthInt, month);
+            return @as(MonthInt, @intCast(month));
         }
     }
 
@@ -488,7 +488,7 @@ pub const Mdf = struct {
         if (day > 31) {
             return 0;
         } else {
-            return @intCast(DayInt, day);
+            return @as(DayInt, @intCast(day));
         }
     }
 
@@ -506,9 +506,9 @@ pub const Mdf = struct {
             const v = OL_TO_MDL[ol];
             const mdl = of.to_bits() + (@as(u13, v) << 3);
             return Mdf{
-                .month = @truncate(MonthInt, mdl >> 9),
-                .day = @truncate(DayInt, mdl >> 4),
-                .year_flags = .{ .flags = @truncate(u4, mdl) },
+                .month = @as(MonthInt, @truncate(mdl >> 9)),
+                .day = @as(DayInt, @truncate(mdl >> 4)),
+                .year_flags = .{ .flags = @as(u4, @truncate(mdl)) },
             };
         } else {
             return Mdf{ .month = 0, .day = 0, .year_flags = .{ .flags = 0 } };

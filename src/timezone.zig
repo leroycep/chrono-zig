@@ -7,8 +7,8 @@ const FixedUTC = Fixed.init(0);
 pub const UTC = &FixedUTC.timezone;
 
 pub const TimeZone = struct {
-    utcToLocalFn: fn (*const @This(), timestamp: i64) i64,
-    timezoneToUtcFn: fn (*const @This(), timestamp: i64) i64,
+    utcToLocalFn: *const fn (*const @This(), timestamp: i64) i64,
+    timezoneToUtcFn: *const fn (*const @This(), timestamp: i64) i64,
 
     pub fn utcToLocal(this: *const @This(), timestamp: i64) i64 {
         return this.utcToLocalFn(this, timestamp);

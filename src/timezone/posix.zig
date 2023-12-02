@@ -96,9 +96,9 @@ pub const TZ = struct {
 
 fn days_in_month(m: u8, is_leap: bool) i32 {
     if (m == 2) {
-        return 28 + @as(i32, @boolToInt(is_leap));
+        return 28 + @as(i32, @intFromBool(is_leap));
     } else {
-        return 30 + ((@as(i32, 0xad5) >> @intCast(u5, m - 1)) & 1);
+        return 30 + ((@as(i32, 0xad5) >> @as(u5, @intCast(m - 1))) & 1);
     }
 }
 
@@ -118,7 +118,7 @@ fn secs_to_year(secs: i64) i32 {
     // Copied from MUSL
     // TODO: make more efficient?
     var _is_leap: bool = undefined;
-    var y = @intCast(i32, @divFloor(secs, 31556952) + 70);
+    var y = @as(i32, @intCast(@divFloor(secs, 31556952) + 70));
     while (year_to_secs(y, &_is_leap) > secs) y -= 1;
     while (year_to_secs(y + 1, &_is_leap) < secs) y += 1;
     return y;
@@ -175,7 +175,7 @@ fn year_to_secs(year: i32, is_leap: *bool) i64 {
         }
     }
 
-    leaps += 97 * cycles + 24 * centuries - @boolToInt(is_leap.*);
+    leaps += 97 * cycles + 24 * centuries - @intFromBool(is_leap.*);
 
     return (year - 100) * 31536000 + leaps * std.time.s_per_day + 946684800 + std.time.s_per_day;
 }
@@ -226,7 +226,7 @@ fn parse_designation(string: []const u8, idx: *usize) ![]const u8 {
     var start = idx.*;
     while (idx.* < string.len) : (idx.* += 1) {
         if ((quoted and string[idx.*] == '>') or
-            (!quoted and !std.ascii.isAlpha(string[idx.*])))
+            (!quoted and !std.ascii.isAlphabetic(string[idx.*])))
         {
             const designation = string[start..idx.*];
             if (quoted) idx.* += 1;

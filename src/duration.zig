@@ -54,7 +54,7 @@ pub fn DurationFormat(comptime durationFormatStr: []const u8) type {
             var last_was_percent = false;
             for (durationFormatStr) |c| {
                 if (last_was_percent) {
-                    switch (@intToEnum(DurationFormatComponent, c)) {
+                    switch (@as(DurationFormatComponent, @enumFromInt(c))) {
                         .percent => try writer.writeByte('%'),
                         .total_hours => try writer.print("{}", .{totalHours(this.secs)}),
                         .total_minutes => try writer.print("{}", .{totalMinutes(this.secs)}),

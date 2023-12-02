@@ -13,7 +13,7 @@ pub fn hhmmss_offset_to_s(_string: []const u8, idx: *usize) !i32 {
         idx.* += 1;
     }
 
-    for (string) |c, i| {
+    for (string, 0..) |c, i| {
         if (!(std.ascii.isDigit(c) or c == ':')) {
             string = string[0..i];
             break;
@@ -29,12 +29,12 @@ pub fn hhmmss_offset_to_s(_string: []const u8, idx: *usize) !i32 {
     if (hours > 167) {
         return error.InvalidFormat;
     }
-    result += std.time.s_per_hour * @intCast(i32, hours);
+    result += std.time.s_per_hour * @as(i32, @intCast(hours));
 
     if (segment_iter.next()) |minute_string| {
         const minutes = try std.fmt.parseInt(u32, minute_string, 10);
         if (minutes > 59) return error.InvalidFormat;
-        result += std.time.s_per_min * @intCast(i32, minutes);
+        result += std.time.s_per_min * @as(i32, @intCast(minutes));
     }
 
     if (segment_iter.next()) |second_string| {
@@ -45,4 +45,3 @@ pub fn hhmmss_offset_to_s(_string: []const u8, idx: *usize) !i32 {
 
     return result * sign;
 }
-
