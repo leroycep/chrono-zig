@@ -1,8 +1,7 @@
 const std = @import("std");
 const testing = std.testing;
-const posix = @import("./posix.zig");
+const Posix = @import("./Posix.zig");
 
-const PosixTZ = posix.TZ;
 const log = std.log.scoped(.tzif);
 
 pub const TimeZone = struct {
@@ -16,7 +15,7 @@ pub const TimeZone = struct {
     transitionIsStd: []bool,
     transitionIsUT: []bool,
     string: []u8,
-    posixTZ: ?PosixTZ,
+    posixTZ: ?Posix,
 
     pub fn deinit(this: @This()) void {
         this.allocator.free(this.transitionTimes);
@@ -347,8 +346,8 @@ pub fn parse(allocator: std.mem.Allocator, reader: anytype, seekableStream: anyt
     const tz_string = try reader.readUntilDelimiterAlloc(allocator, '\n', 60);
     errdefer allocator.free(tz_string);
 
-    const posixTZ: ?PosixTZ = if (tz_string.len > 0)
-        try posix.parse(tz_string)
+    const posixTZ: ?Posix = if (tz_string.len > 0)
+        try Posix.parse(tz_string)
     else
         null;
 

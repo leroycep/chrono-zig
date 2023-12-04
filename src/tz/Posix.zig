@@ -1,214 +1,119 @@
-const std = @import("std");
-const hhmmss_offset_to_s = @import("./util.zig").hhmmss_offset_to_s;
-const isLeapYear = @import("./util.zig").isLeapYear;
-const year_to_secs = @import("./util.zig").year_to_secs;
-const month_to_secs = @import("./util.zig").month_to_secs;
-const days_in_month = @import("./util.zig").days_in_month;
-const secs_to_year = @import("./util.zig").secs_to_year;
-const testing = std.testing;
+///! This is based on Posix definition of the TZ environment variable
+std_designation: []const u8,
+std_offset: i32,
+dst_designation: ?[]const u8 = null,
+/// This field is ignored when dst is null
+dst_offset: i32 = 0,
+dst_range: ?struct {
+    start: Rule,
+    end: Rule,
+} = null,
 
-/// This is based on Posix definition of the TZ environment variable
-pub const TZ = struct {
-    std_designation: []const u8,
-    std_offset: i32,
-    dst_designation: ?[]const u8 = null,
-    /// This field is ignored when dst is null
-    dst_offset: i32 = 0,
-    dst_range: ?struct {
-        start: Rule,
-        end: Rule,
-    } = null,
+pub const Rule = union(enum) {
+    JulianDay: struct {
+        /// 1 <= day <= 365. Leap days are not counted and are impossible to refer to
+        day: u16,
+        /// The default DST transition time is 02:00:00 local time
+        time: chrono.duration.HoursMinutesSeconds = chrono.duration.HoursMinutesSeconds.new(2, 0, 0),
+    },
+    JulianDayZero: struct {
+        /// 0 <= day <= 365. Leap days are counted, and can be referred to.
+        day: u16,
+        /// The default DST transition time is 02:00:00 local time
+        time: chrono.duration.HoursMinutesSeconds = chrono.duration.HoursMinutesSeconds.new(2, 0, 0),
+    },
+    /// In the format of "Mm.n.d", where m = month, n = n, and d = day.
+    MonthNthWeekday: struct {
+        /// Month of the year. 1 <= month <= 12
+        month: chrono.date.Month,
+        /// Specifies which of the weekdays should be used. Does NOT specify the week of the month! 1 <= week <= 5.
+        ///
+        /// Let's use M3.2.0 as an example. The month is 3, which translates to March.
+        /// The day is 0, which means Sunday. `n` is 2, which means the second Sunday
+        /// in the month, NOT Sunday of the second week!
+        ///
+        /// In 2021, this is difference between 2023-03-07 (Sunday of the second week of March)
+        /// and 2023-03-14 (the Second Sunday of March).
+        ///
+        /// * When n is 1, it means the first week in which the day `day` occurs.
+        /// * 5 is a special case. When n is 5, it means "the last day `day` in the month", which may occur in either the fourth or the fifth week.
+        n: u8,
+        weekday: chrono.date.Weekday,
+        /// The default DST transition time is 02:00:00 local time
+        time: chrono.duration.HoursMinutesSeconds = chrono.duration.HoursMinutesSeconds.new(2, 0, 0),
+    },
 
-    pub const Rule = union(enum) {
-        JulianDay: struct {
-            /// 1 <= day <= 365. Leap days are not counted and are impossible to refer to
-            day: u16,
-            /// The default DST transition time is 02:00:00 local time
-            time: i32 = 2 * std.time.s_per_hour,
-        },
-        JulianDayZero: struct {
-            /// 0 <= day <= 365. Leap days are counted, and can be referred to.
-            day: u16,
-            /// The default DST transition time is 02:00:00 local time
-            time: i32 = 2 * std.time.s_per_hour,
-        },
-        /// In the format of "Mm.n.d", where m = month, n = n, and d = day.
-        MonthNthWeekDay: struct {
-            /// Month of the year. 1 <= month <= 12
-            month: u8,
-            /// Specifies which of the weekdays should be used. Does NOT specify the week of the month! 1 <= week <= 5.
-            ///
-            /// Let's use M3.2.0 as an example. The month is 3, which translates to March.
-            /// The day is 0, which means Sunday. `n` is 2, which means the second Sunday
-            /// in the month, NOT Sunday of the second week!
-            ///
-            /// In 2021, this is difference between 2023-03-07 (Sunday of the second week of March)
-            /// and 2023-03-14 (the Second Sunday of March).
-            ///
-            /// * When n is 1, it means the first week in which the day `day` occurs.
-            /// * 5 is a special case. When n is 5, it means "the last day `day` in the month", which may occur in either the fourth or the fifth week.
-            n: u8,
-            /// Day of the week. 0 <= day <= 6. Day zero is Sunday.
-            day: u8,
-            /// The default DST transition time is 02:00:00 local time
-            time: i32 = 2 * std.time.s_per_hour,
-        },
-
-        pub fn isAtStartOfYear(this: @This()) bool {
-            switch (this) {
-                .JulianDay => |j| return j.day == 1 and j.time == 0,
-                .JulianDayZero => |j| return j.day == 0 and j.time == 0,
-                .MonthNthWeekDay => |mwd| return mwd.month == 1 and mwd.n == 1 and mwd.day == 0 and mwd.time == 0,
-            }
+    pub fn isAtStartOfYear(this: @This()) bool {
+        switch (this) {
+            .JulianDay => |j| return j.day == 1 and j.time.toSeconds() == 0,
+            .JulianDayZero => |j| return j.day == 0 and j.time.toSeconds() == 0,
+            .MonthNthWeekday => |mwd| return mwd.month == .jan and mwd.n == 1 and mwd.weekday == .sun and mwd.time.toSeconds() == 0,
         }
+    }
 
-        pub fn isAtEndOfYear(this: @This()) bool {
-            switch (this) {
-                .JulianDay => |j| return j.day == 365 and j.time >= 24,
-                // Since JulianDayZero dates account for leap year, it would vary depending on the year.
-                .JulianDayZero => return false,
-                // There is also no way to specify "end of the year" with MonthNthWeekDay rules
-                .MonthNthWeekDay => return false,
-            }
+    pub fn isAtEndOfYear(this: @This()) bool {
+        switch (this) {
+            .JulianDay => |j| return j.day == 365 and j.time.toSeconds() >= 24,
+            // Since JulianDayZero dates account for leap year, it would vary depending on the year.
+            .JulianDayZero => return false,
+            // There is also no way to specify "end of the year" with MonthNthWeekday rules
+            .MonthNthWeekday => return false,
         }
+    }
 
-        /// Returned value is the local timestamp when the timezone will transition in the given year.
-        pub fn toSecs(this: @This(), year: i32) i64 {
-            const is_leap: bool = isLeapYear(year);
-            const start_of_year = year_to_secs(year);
+    /// Returned value is the local timestamp when the timezone will transition in the given year.
+    pub fn toTimestamp(this: @This(), year: i32) i64 {
+        const is_leap: bool = chrono.date.isLeapYear(year);
+        const start_of_year = chrono.date.YearMonthDay.fromNumbers(@intCast(year), 1, 1).toDaysSinceUnixEpoch();
 
-            var t = start_of_year;
+        // how many days into the year does the rule say the transition is?
+        const day_of_year = switch (this) {
+            .JulianDay => |j| if (j.day < 60 or !is_leap) j.day - 1 else j.day,
+            .JulianDayZero => |j| j.day,
+            .MonthNthWeekday => |mwd| calculate_days_since_start_of_year: {
+                const first_day_of_year_in_month = if (@intFromEnum(mwd.month) <= @intFromEnum(chrono.date.Month.feb) or !is_leap)
+                    chrono.date.Month.FIRST_DAY_OF_COMMON_YEAR[@intFromEnum(mwd.month) - 1]
+                else
+                    chrono.date.Month.FIRST_DAY_OF_LEAP_YEAR[@intFromEnum(mwd.month) - 1];
 
-            switch (this) {
-                .JulianDay => |j| {
-                    var x: i64 = j.day;
-                    if (x < 60 or !is_leap) x -= 1;
-                    t += std.time.s_per_day * x;
-                    t += j.time;
-                },
-                .JulianDayZero => |j| {
-                    t += std.time.s_per_day * @as(i64, j.day);
-                    t += j.time;
-                },
-                .MonthNthWeekDay => |mwd| {
-                    const offset_of_month_in_year = month_to_secs(mwd.month - 1, is_leap);
+                const days_since_epoch = start_of_year + first_day_of_year_in_month;
+                const first_weekday_of_month = chrono.date.Weekday.fromDaysSinceUnixEpoch(days_since_epoch);
 
-                    const UNIX_EPOCH_WEEKDAY = 4; // Thursday
-                    const DAYS_PER_WEEK = 7;
+                const weekday_offset_for_month = mwd.weekday.difference(first_weekday_of_month);
 
-                    const days_since_epoch = @divFloor(start_of_year + offset_of_month_in_year, std.time.s_per_day);
-
-                    const first_weekday_of_month = @mod(days_since_epoch + UNIX_EPOCH_WEEKDAY, DAYS_PER_WEEK);
-
-                    const weekday_offset_for_month = if (first_weekday_of_month <= mwd.day)
-                        // the first matching weekday is during the first week of the month
-                        mwd.day - first_weekday_of_month
+                const DAYS_PER_WEEK: u9 = chrono.date.WEEKDAYS.len;
+                const days_since_start_of_month = switch (mwd.n) {
+                    1...4 => |n| (n - 1) * DAYS_PER_WEEK + weekday_offset_for_month,
+                    5 => if (weekday_offset_for_month + (4 * DAYS_PER_WEEK) >= mwd.month.lastDay(year))
+                        // the last matching weekday is during the 4th week of the month
+                        (4 - 1) * DAYS_PER_WEEK + weekday_offset_for_month
                     else
-                        // the first matching weekday is during the second week of the month
-                        mwd.day + DAYS_PER_WEEK - first_weekday_of_month;
-
-                    const days_since_start_of_month = switch (mwd.n) {
-                        1...4 => |n| (n - 1) * DAYS_PER_WEEK + weekday_offset_for_month,
-                        5 => if (weekday_offset_for_month + (4 * DAYS_PER_WEEK) >= days_in_month(mwd.month, is_leap))
-                            // the last matching weekday is during the 4th week of the month
-                            (4 - 1) * DAYS_PER_WEEK + weekday_offset_for_month
-                        else
-                            // the last matching weekday is during the 5th week of the month
-                            (5 - 1) * DAYS_PER_WEEK + weekday_offset_for_month,
-                        else => unreachable,
-                    };
-
-                    t += offset_of_month_in_year + std.time.s_per_day * days_since_start_of_month;
-                    t += mwd.time;
-                },
-            }
-            return t;
-        }
-
-        pub fn format(
-            this: @This(),
-            comptime fmt: []const u8,
-            options: std.fmt.FormatOptions,
-            writer: anytype,
-        ) !void {
-            _ = fmt;
-            _ = options;
-
-            switch (this) {
-                .JulianDay => |julian_day| {
-                    try std.fmt.format(writer, "J{}", .{julian_day.day});
-                },
-                .JulianDayZero => |julian_day_zero| {
-                    try std.fmt.format(writer, "{}", .{julian_day_zero.day});
-                },
-                .MonthNthWeekDay => |month_week_day| {
-                    try std.fmt.format(writer, "M{}.{}.{}", .{
-                        month_week_day.month,
-                        month_week_day.n,
-                        month_week_day.day,
-                    });
-                },
-            }
-
-            const time = switch (this) {
-                inline else => |rule| rule.time,
-            };
-
-            // Only write out the time if it is not the default time of 02:00
-            if (time != 2 * std.time.s_per_hour) {
-                const seconds = @mod(time, std.time.s_per_min);
-                const minutes = @mod(@divTrunc(time, std.time.s_per_min), 60);
-                const hours = @divTrunc(@divTrunc(time, std.time.s_per_min), 60);
-
-                try std.fmt.format(writer, "/{}", .{hours});
-                if (minutes != 0 or seconds != 0) {
-                    try std.fmt.format(writer, ":{}", .{minutes});
-                }
-                if (seconds != 0) {
-                    try std.fmt.format(writer, ":{}", .{seconds});
-                }
-            }
-        }
-    };
-
-    pub const OffsetResult = struct {
-        offset: i32,
-        designation: []const u8,
-        is_daylight_saving_time: bool,
-    };
-
-    /// Get the offset from UTC for this TZ, factoring in Daylight Saving Time.
-    pub fn offset(this: @This(), utc: i64) OffsetResult {
-        const dst_designation = this.dst_designation orelse {
-            std.debug.assert(this.dst_range == null);
-            return .{ .offset = this.std_offset, .designation = this.std_designation, .is_daylight_saving_time = false };
+                        // the last matching weekday is during the 5th week of the month
+                        (5 - 1) * DAYS_PER_WEEK + weekday_offset_for_month,
+                    else => unreachable,
+                };
+                break :calculate_days_since_start_of_year first_day_of_year_in_month + days_since_start_of_month;
+            },
         };
-        if (this.dst_range) |range| {
-            const utc_year = secs_to_year(utc);
-            const start_dst = range.start.toSecs(utc_year) - this.std_offset;
-            const end_dst = range.end.toSecs(utc_year) - this.dst_offset;
 
-            const is_dst_all_year = range.start.isAtStartOfYear() and range.end.isAtEndOfYear();
-            if (is_dst_all_year) {
-                return .{ .offset = this.dst_offset, .designation = dst_designation, .is_daylight_saving_time = true };
-            }
+        const time = switch (this) {
+            inline else => |r| r.time,
+        };
 
-            if (start_dst < end_dst) {
-                if (utc >= start_dst and utc < end_dst) {
-                    return .{ .offset = this.dst_offset, .designation = dst_designation, .is_daylight_saving_time = true };
-                } else {
-                    return .{ .offset = this.std_offset, .designation = this.std_designation, .is_daylight_saving_time = false };
-                }
-            } else {
-                if (utc >= end_dst and utc < start_dst) {
-                    return .{ .offset = this.std_offset, .designation = this.std_designation, .is_daylight_saving_time = false };
-                } else {
-                    return .{ .offset = this.dst_offset, .designation = dst_designation, .is_daylight_saving_time = true };
-                }
-            }
-        } else {
-            return .{ .offset = this.std_offset, .designation = this.std_designation, .is_daylight_saving_time = false };
-        }
+        return (@as(i64, start_of_year) + day_of_year) * std.time.s_per_day + time.toSeconds();
+    }
+
+    test "M3.2.0/01:30 toTimestamp" {
+        // Transition times with minutes and seconds
+        const rule = @This(){
+            .MonthNthWeekday = .{
+                .month = .mar,
+                .n = 2,
+                .weekday = .sun,
+                .time = chrono.duration.HoursMinutesSeconds.new(1, 30, 0),
+            },
+        };
+        try testing.expectEqual(@as(i64, 1331429400), rule.toTimestamp(2012)); // 2012-03-11T01:00:00-03:00
     }
 
     pub fn format(
@@ -220,181 +125,274 @@ pub const TZ = struct {
         _ = fmt;
         _ = options;
 
-        const should_quote_std_designation = for (this.std_designation) |character| {
+        switch (this) {
+            .JulianDay => |julian_day| {
+                try std.fmt.format(writer, "J{}", .{julian_day.day});
+            },
+            .JulianDayZero => |julian_day_zero| {
+                try std.fmt.format(writer, "{}", .{julian_day_zero.day});
+            },
+            .MonthNthWeekday => |month_week_day| {
+                try std.fmt.format(writer, "M{}.{}.{}", .{
+                    @intFromEnum(month_week_day.month),
+                    month_week_day.n,
+                    month_week_day.weekday.toIntSun0(),
+                });
+            },
+        }
+
+        const time = switch (this) {
+            inline else => |rule| rule.time.toSeconds(),
+        };
+
+        // Only write out the time if it is not the default time of 02:00
+        if (time != 2 * std.time.s_per_hour) {
+            const seconds = @mod(time, std.time.s_per_min);
+            const minutes = @mod(@divTrunc(time, std.time.s_per_min), 60);
+            const hours = @divTrunc(@divTrunc(time, std.time.s_per_min), 60);
+
+            try std.fmt.format(writer, "/{}", .{hours});
+            if (minutes != 0 or seconds != 0) {
+                try std.fmt.format(writer, ":{}", .{minutes});
+            }
+            if (seconds != 0) {
+                try std.fmt.format(writer, ":{}", .{seconds});
+            }
+        }
+    }
+};
+
+pub const OffsetResult = struct {
+    offset: i32,
+    designation: []const u8,
+    is_daylight_saving_time: bool,
+};
+
+/// Get the offset from UTC for this TZ, factoring in Daylight Saving Time.
+pub fn offset(this: @This(), timestamp: i64) OffsetResult {
+    const dst_designation = this.dst_designation orelse {
+        std.debug.assert(this.dst_range == null);
+        return .{ .offset = this.std_offset, .designation = this.std_designation, .is_daylight_saving_time = false };
+    };
+    if (this.dst_range) |range| {
+        const ymd = chrono.date.YearMonthDay.fromDaysSinceUnixEpoch(@intCast(@divFloor(timestamp, std.time.s_per_day)));
+        const start_dst = range.start.toTimestamp(ymd.year) - this.std_offset;
+        const end_dst = range.end.toTimestamp(ymd.year) - this.dst_offset;
+
+        const is_dst_all_year = range.start.isAtStartOfYear() and range.end.isAtEndOfYear();
+        if (is_dst_all_year) {
+            return .{ .offset = this.dst_offset, .designation = dst_designation, .is_daylight_saving_time = true };
+        }
+
+        if (start_dst < end_dst) {
+            if (timestamp >= start_dst and timestamp < end_dst) {
+                return .{ .offset = this.dst_offset, .designation = dst_designation, .is_daylight_saving_time = true };
+            } else {
+                return .{ .offset = this.std_offset, .designation = this.std_designation, .is_daylight_saving_time = false };
+            }
+        } else {
+            if (timestamp >= end_dst and timestamp < start_dst) {
+                return .{ .offset = this.std_offset, .designation = this.std_designation, .is_daylight_saving_time = false };
+            } else {
+                return .{ .offset = this.dst_offset, .designation = dst_designation, .is_daylight_saving_time = true };
+            }
+        }
+    } else {
+        return .{ .offset = this.std_offset, .designation = this.std_designation, .is_daylight_saving_time = false };
+    }
+}
+
+pub fn format(
+    this: @This(),
+    comptime fmt: []const u8,
+    options: std.fmt.FormatOptions,
+    writer: anytype,
+) !void {
+    _ = fmt;
+    _ = options;
+
+    const should_quote_std_designation = for (this.std_designation) |character| {
+        if (!std.ascii.isAlphabetic(character)) {
+            break true;
+        }
+    } else false;
+
+    if (should_quote_std_designation) {
+        try writer.writeAll("<");
+        try writer.writeAll(this.std_designation);
+        try writer.writeAll(">");
+    } else {
+        try writer.writeAll(this.std_designation);
+    }
+
+    const std_offset_west = -this.std_offset;
+    const std_seconds = @rem(std_offset_west, std.time.s_per_min);
+    const std_minutes = @rem(@divTrunc(std_offset_west, std.time.s_per_min), 60);
+    const std_hours = @divTrunc(@divTrunc(std_offset_west, std.time.s_per_min), 60);
+
+    try std.fmt.format(writer, "{}", .{std_hours});
+    if (std_minutes != 0 or std_seconds != 0) {
+        try std.fmt.format(writer, ":{}", .{if (std_minutes < 0) -std_minutes else std_minutes});
+    }
+    if (std_seconds != 0) {
+        try std.fmt.format(writer, ":{}", .{if (std_seconds < 0) -std_seconds else std_seconds});
+    }
+
+    if (this.dst_designation) |dst_designation| {
+        const should_quote_dst_designation = for (dst_designation) |character| {
             if (!std.ascii.isAlphabetic(character)) {
                 break true;
             }
         } else false;
 
-        if (should_quote_std_designation) {
+        if (should_quote_dst_designation) {
             try writer.writeAll("<");
-            try writer.writeAll(this.std_designation);
+            try writer.writeAll(dst_designation);
             try writer.writeAll(">");
         } else {
-            try writer.writeAll(this.std_designation);
+            try writer.writeAll(dst_designation);
         }
 
-        const std_offset_west = -this.std_offset;
-        const std_seconds = @rem(std_offset_west, std.time.s_per_min);
-        const std_minutes = @rem(@divTrunc(std_offset_west, std.time.s_per_min), 60);
-        const std_hours = @divTrunc(@divTrunc(std_offset_west, std.time.s_per_min), 60);
+        // Only write out the DST offset if it is not just the standard offset plus an hour
+        if (this.dst_offset != this.std_offset + std.time.s_per_hour) {
+            const dst_offset_west = -this.dst_offset;
+            const dst_seconds = @rem(dst_offset_west, std.time.s_per_min);
+            const dst_minutes = @rem(@divTrunc(dst_offset_west, std.time.s_per_min), 60);
+            const dst_hours = @divTrunc(@divTrunc(dst_offset_west, std.time.s_per_min), 60);
 
-        try std.fmt.format(writer, "{}", .{std_hours});
-        if (std_minutes != 0 or std_seconds != 0) {
-            try std.fmt.format(writer, ":{}", .{if (std_minutes < 0) -std_minutes else std_minutes});
-        }
-        if (std_seconds != 0) {
-            try std.fmt.format(writer, ":{}", .{if (std_seconds < 0) -std_seconds else std_seconds});
-        }
-
-        if (this.dst_designation) |dst_designation| {
-            const should_quote_dst_designation = for (dst_designation) |character| {
-                if (!std.ascii.isAlphabetic(character)) {
-                    break true;
-                }
-            } else false;
-
-            if (should_quote_dst_designation) {
-                try writer.writeAll("<");
-                try writer.writeAll(dst_designation);
-                try writer.writeAll(">");
-            } else {
-                try writer.writeAll(dst_designation);
+            try std.fmt.format(writer, "{}", .{dst_hours});
+            if (dst_minutes != 0 or dst_seconds != 0) {
+                try std.fmt.format(writer, ":{}", .{if (dst_minutes < 0) -dst_minutes else dst_minutes});
             }
-
-            // Only write out the DST offset if it is not just the standard offset plus an hour
-            if (this.dst_offset != this.std_offset + std.time.s_per_hour) {
-                const dst_offset_west = -this.dst_offset;
-                const dst_seconds = @rem(dst_offset_west, std.time.s_per_min);
-                const dst_minutes = @rem(@divTrunc(dst_offset_west, std.time.s_per_min), 60);
-                const dst_hours = @divTrunc(@divTrunc(dst_offset_west, std.time.s_per_min), 60);
-
-                try std.fmt.format(writer, "{}", .{dst_hours});
-                if (dst_minutes != 0 or dst_seconds != 0) {
-                    try std.fmt.format(writer, ":{}", .{if (dst_minutes < 0) -dst_minutes else dst_minutes});
-                }
-                if (dst_seconds != 0) {
-                    try std.fmt.format(writer, ":{}", .{if (dst_seconds < 0) -dst_seconds else dst_seconds});
-                }
+            if (dst_seconds != 0) {
+                try std.fmt.format(writer, ":{}", .{if (dst_seconds < 0) -dst_seconds else dst_seconds});
             }
-        }
-
-        if (this.dst_range) |dst_range| {
-            try std.fmt.format(writer, ",{},{}", .{ dst_range.start, dst_range.end });
         }
     }
 
-    test format {
-        const america_denver = TZ{
-            .std_designation = "MST",
-            .std_offset = -25200,
-            .dst_designation = "MDT",
-            .dst_offset = -21600,
-            .dst_range = .{
-                .start = .{
-                    .MonthNthWeekDay = .{
-                        .month = 3,
-                        .n = 2,
-                        .day = 0,
-                        .time = 2 * std.time.s_per_hour,
-                    },
-                },
-                .end = .{
-                    .MonthNthWeekDay = .{
-                        .month = 11,
-                        .n = 1,
-                        .day = 0,
-                        .time = 2 * std.time.s_per_hour,
-                    },
-                },
-            },
-        };
-
-        try std.testing.expectFmt("MST7MDT,M3.2.0,M11.1.0", "{}", .{america_denver});
-
-        const europe_berlin = TZ{
-            .std_designation = "CET",
-            .std_offset = 3600,
-            .dst_designation = "CEST",
-            .dst_offset = 7200,
-            .dst_range = .{
-                .start = .{
-                    .MonthNthWeekDay = .{
-                        .month = 3,
-                        .n = 5,
-                        .day = 0,
-                        .time = 2 * std.time.s_per_hour,
-                    },
-                },
-                .end = .{
-                    .MonthNthWeekDay = .{
-                        .month = 10,
-                        .n = 5,
-                        .day = 0,
-                        .time = 3 * std.time.s_per_hour,
-                    },
-                },
-            },
-        };
-        try std.testing.expectFmt("CET-1CEST,M3.5.0,M10.5.0/3", "{}", .{europe_berlin});
-
-        const antarctica_syowa = TZ{
-            .std_designation = "+03",
-            .std_offset = 3 * std.time.s_per_hour,
-            .dst_designation = null,
-            .dst_offset = undefined,
-            .dst_range = null,
-        };
-        try std.testing.expectFmt("<+03>-3", "{}", .{antarctica_syowa});
-
-        const pacific_chatham = TZ{
-            .std_designation = "+1245",
-            .std_offset = 12 * std.time.s_per_hour + 45 * std.time.s_per_min,
-            .dst_designation = "+1345",
-            .dst_offset = 13 * std.time.s_per_hour + 45 * std.time.s_per_min,
-            .dst_range = .{
-                .start = .{
-                    .MonthNthWeekDay = .{
-                        .month = 9,
-                        .n = 5,
-                        .day = 0,
-                        .time = 2 * std.time.s_per_hour + 45 * std.time.s_per_min,
-                    },
-                },
-                .end = .{
-                    .MonthNthWeekDay = .{
-                        .month = 4,
-                        .n = 1,
-                        .day = 0,
-                        .time = 3 * std.time.s_per_hour + 45 * std.time.s_per_min,
-                    },
-                },
-            },
-        };
-        try std.testing.expectFmt("<+1245>-12:45<+1345>,M9.5.0/2:45,M4.1.0/3:45", "{}", .{pacific_chatham});
+    if (this.dst_range) |dst_range| {
+        try std.fmt.format(writer, ",{},{}", .{ dst_range.start, dst_range.end });
     }
-};
+}
 
-fn parseTZ_rule(_string: []const u8) !TZ.Rule {
+const TZ = @This();
+
+test format {
+    const america_denver = TZ{
+        .std_designation = "MST",
+        .std_offset = -25200,
+        .dst_designation = "MDT",
+        .dst_offset = -21600,
+        .dst_range = .{
+            .start = .{
+                .MonthNthWeekday = .{
+                    .month = .mar,
+                    .n = 2,
+                    .weekday = .sun,
+                    .time = chrono.duration.HoursMinutesSeconds.new(2, 0, 0),
+                },
+            },
+            .end = .{
+                .MonthNthWeekday = .{
+                    .month = .nov,
+                    .n = 1,
+                    .weekday = .sun,
+                    .time = chrono.duration.HoursMinutesSeconds.new(2, 0, 0),
+                },
+            },
+        },
+    };
+
+    try std.testing.expectFmt("MST7MDT,M3.2.0,M11.1.0", "{}", .{america_denver});
+
+    const europe_berlin = TZ{
+        .std_designation = "CET",
+        .std_offset = 3600,
+        .dst_designation = "CEST",
+        .dst_offset = 7200,
+        .dst_range = .{
+            .start = .{
+                .MonthNthWeekday = .{
+                    .month = .mar,
+                    .n = 5,
+                    .weekday = .sun,
+                    .time = chrono.duration.HoursMinutesSeconds.new(2, 0, 0),
+                },
+            },
+            .end = .{
+                .MonthNthWeekday = .{
+                    .month = .oct,
+                    .n = 5,
+                    .weekday = .sun,
+                    .time = chrono.duration.HoursMinutesSeconds.new(3, 0, 0),
+                },
+            },
+        },
+    };
+    try std.testing.expectFmt("CET-1CEST,M3.5.0,M10.5.0/3", "{}", .{europe_berlin});
+
+    const antarctica_syowa = TZ{
+        .std_designation = "+03",
+        .std_offset = 3 * std.time.s_per_hour,
+        .dst_designation = null,
+        .dst_offset = undefined,
+        .dst_range = null,
+    };
+    try std.testing.expectFmt("<+03>-3", "{}", .{antarctica_syowa});
+
+    const pacific_chatham = TZ{
+        .std_designation = "+1245",
+        .std_offset = 12 * std.time.s_per_hour + 45 * std.time.s_per_min,
+        .dst_designation = "+1345",
+        .dst_offset = 13 * std.time.s_per_hour + 45 * std.time.s_per_min,
+        .dst_range = .{
+            .start = .{
+                .MonthNthWeekday = .{
+                    .month = .sep,
+                    .n = 5,
+                    .weekday = .sun,
+                    .time = chrono.duration.HoursMinutesSeconds.new(2, 45, 0),
+                },
+            },
+            .end = .{
+                .MonthNthWeekday = .{
+                    .month = .apr,
+                    .n = 1,
+                    .weekday = .sun,
+                    .time = chrono.duration.HoursMinutesSeconds.new(3, 45, 0),
+                },
+            },
+        },
+    };
+    try std.testing.expectFmt("<+1245>-12:45<+1345>,M9.5.0/2:45,M4.1.0/3:45", "{}", .{pacific_chatham});
+}
+
+fn parseRule(_string: []const u8) !Rule {
     var string = _string;
     if (string.len < 2) return error.InvalidFormat;
 
-    const time: i32 = if (std.mem.indexOf(u8, string, "/")) |start_of_time| parse_time: {
+    const time: chrono.duration.HoursMinutesSeconds = if (std.mem.indexOf(u8, string, "/")) |start_of_time| parse_time: {
         const time_string = string[start_of_time + 1 ..];
-
-        var i: usize = 0;
-        const time = try hhmmss_offset_to_s(time_string, &i);
 
         // The time at the end of the rule should be the last thing in the string. Fixes the parsing to return
         // an error in cases like "/2/3", where they have some extra characters.
-        if (i != time_string.len) {
+        for (time_string) |c| {
+            if (!(std.ascii.isDigit(c) or c == ':' or c == '-' or c == '+')) {
+                return error.InvalidFormat;
+            }
+        }
+
+        const time = try chrono.duration.HoursMinutesSeconds.parse(time_string, null);
+
+        // Posix only allows +/- 24 hours, but GNU allows +/- 167 hours
+        if (time.hours > 167) {
             return error.InvalidFormat;
         }
 
         string = string[0..start_of_time];
 
         break :parse_time time;
-    } else 2 * std.time.s_per_hour;
+    } else chrono.duration.HoursMinutesSeconds.new(2, 0, 0);
 
     if (string[0] == 'J') {
         const julian_day1 = std.fmt.parseInt(u16, string[1..], 10) catch |err| switch (err) {
@@ -426,7 +424,7 @@ fn parseTZ_rule(_string: []const u8) !TZ.Rule {
             error.InvalidCharacter => return error.InvalidFormat,
             error.Overflow => return error.InvalidFormat,
         };
-        const d = std.fmt.parseInt(u8, d_str, 10) catch |err| switch (err) {
+        const d = std.fmt.parseInt(u3, d_str, 10) catch |err| switch (err) {
             error.InvalidCharacter => return error.InvalidFormat,
             error.Overflow => return error.InvalidFormat,
         };
@@ -435,13 +433,18 @@ fn parseTZ_rule(_string: []const u8) !TZ.Rule {
         if (n < 1 or n > 5) return error.InvalidFormat;
         if (d > 6) return error.InvalidFormat;
 
-        return TZ.Rule{ .MonthNthWeekDay = .{ .month = m, .n = n, .day = d, .time = time } };
+        return TZ.Rule{ .MonthNthWeekday = .{
+            .month = @enumFromInt(m),
+            .n = n,
+            .weekday = chrono.date.Weekday.fromIntSun0(d),
+            .time = time,
+        } };
     } else {
         return error.InvalidFormat;
     }
 }
 
-fn parseTZ_designation(string: []const u8, idx: *usize) ![]const u8 {
+fn parseDesignation(string: []const u8, idx: *usize) ![]const u8 {
     const quoted = string[idx.*] == '<';
     if (quoted) idx.* += 1;
     const start = idx.*;
@@ -465,20 +468,42 @@ pub fn parse(string: []const u8) !TZ {
     var result = TZ{ .std_designation = undefined, .std_offset = undefined };
     var idx: usize = 0;
 
-    result.std_designation = try parseTZ_designation(string, &idx);
+    result.std_designation = try parseDesignation(string, &idx);
+
+    const end_of_std_offset = for (string[idx..], idx..) |c, i| {
+        if (!(std.ascii.isDigit(c) or c == ':' or c == '-' or c == '+')) {
+            break i;
+        }
+    } else string.len;
 
     // multiply by -1 to get offset as seconds East of Greenwich as TZif specifies it:
-    result.std_offset = try hhmmss_offset_to_s(string[idx..], &idx) * -1;
+    const std_offset_hms = try chrono.duration.HoursMinutesSeconds.parse(string[idx..end_of_std_offset], null);
+    if (std_offset_hms.hours > 167) {
+        return error.InvalidFormat;
+    }
+    result.std_offset = @intCast(std_offset_hms.toSeconds() * -1);
+    idx = end_of_std_offset;
     if (idx >= string.len) {
         return result;
     }
 
     if (string[idx] != ',') {
-        result.dst_designation = try parseTZ_designation(string, &idx);
+        result.dst_designation = try parseDesignation(string, &idx);
+
+        const end_of_dst_offset = for (string[idx..], idx..) |c, i| {
+            if (!(std.ascii.isDigit(c) or c == ':' or c == '-' or c == '+')) {
+                break i;
+            }
+        } else string.len;
 
         if (idx < string.len and string[idx] != ',') {
             // multiply by -1 to get offset as seconds East of Greenwich as TZif specifies it:
-            result.dst_offset = try hhmmss_offset_to_s(string[idx..], &idx) * -1;
+            const dst_offset_hms = try chrono.duration.HoursMinutesSeconds.parse(string[idx..end_of_dst_offset], null);
+            if (dst_offset_hms.hours > 167) {
+                return error.InvalidFormat;
+            }
+            result.dst_offset = @intCast(dst_offset_hms.toSeconds() * -1);
+            idx = end_of_dst_offset;
         } else {
             result.dst_offset = result.std_offset + std.time.s_per_hour;
         }
@@ -491,11 +516,10 @@ pub fn parse(string: []const u8) !TZ {
     std.debug.assert(string[idx] == ',');
     idx += 1;
 
-    if (std.mem.indexOf(u8, string[idx..], ",")) |_end_of_start_rule| {
-        const end_of_start_rule = idx + _end_of_start_rule;
+    if (std.mem.indexOfScalarPos(u8, string, idx, ',')) |end_of_start_rule| {
         result.dst_range = .{
-            .start = try parseTZ_rule(string[idx..end_of_start_rule]),
-            .end = try parseTZ_rule(string[end_of_start_rule + 1 ..]),
+            .start = try parseRule(string[idx..end_of_start_rule]),
+            .end = try parseRule(string[end_of_start_rule + 1 ..]),
         };
     } else {
         return error.InvalidFormat;
@@ -513,8 +537,8 @@ test "posix TZ string, regular year" {
     try testing.expectEqual(stdoff, result.std_offset);
     try testing.expectEqualSlices(u8, "MDT", result.dst_designation.?);
     try testing.expectEqual(dstoff, result.dst_offset);
-    try testing.expectEqual(TZ.Rule{ .MonthNthWeekDay = .{ .month = 3, .n = 2, .day = 0, .time = 2 * std.time.s_per_hour } }, result.dst_range.?.start);
-    try testing.expectEqual(TZ.Rule{ .MonthNthWeekDay = .{ .month = 11, .n = 1, .day = 0, .time = 2 * std.time.s_per_hour } }, result.dst_range.?.end);
+    try testing.expectEqual(TZ.Rule{ .MonthNthWeekday = .{ .month = .mar, .n = 2, .weekday = .sun, .time = chrono.duration.HoursMinutesSeconds.new(2, 0, 0) } }, result.dst_range.?.start);
+    try testing.expectEqual(TZ.Rule{ .MonthNthWeekday = .{ .month = .nov, .n = 1, .weekday = .sun, .time = chrono.duration.HoursMinutesSeconds.new(2, 0, 0) } }, result.dst_range.?.end);
     try testing.expectEqual(stdoff, result.offset(1612734960).offset);
     // 2021-03-14T01:59:59-07:00 (2nd Sunday of the 3rd month, MST)
     try testing.expectEqual(stdoff, result.offset(1615712399).offset);
@@ -534,8 +558,8 @@ test "posix TZ string, regular year" {
     try testing.expectEqual(stdoff, result.std_offset);
     try testing.expectEqualSlices(u8, "CEST", result.dst_designation.?);
     try testing.expectEqual(dstoff, result.dst_offset);
-    try testing.expectEqual(TZ.Rule{ .MonthNthWeekDay = .{ .month = 3, .n = 5, .day = 0, .time = 2 * std.time.s_per_hour } }, result.dst_range.?.start);
-    try testing.expectEqual(TZ.Rule{ .MonthNthWeekDay = .{ .month = 10, .n = 5, .day = 0, .time = 3 * std.time.s_per_hour } }, result.dst_range.?.end);
+    try testing.expectEqual(TZ.Rule{ .MonthNthWeekday = .{ .month = .mar, .n = 5, .weekday = .sun, .time = chrono.duration.HoursMinutesSeconds.new(2, 0, 0) } }, result.dst_range.?.start);
+    try testing.expectEqual(TZ.Rule{ .MonthNthWeekday = .{ .month = .oct, .n = 5, .weekday = .sun, .time = chrono.duration.HoursMinutesSeconds.new(3, 0, 0) } }, result.dst_range.?.end);
     // 2023-10-29T00:59:59Z, or 2023-10-29 01:59:59 CEST. Offset should still be CEST.
     try testing.expectEqual(dstoff, result.offset(1698541199).offset);
     // 2023-10-29T01:00:00Z, or 2023-10-29 03:00:00 CEST. Offset should now be CET.
@@ -868,80 +892,96 @@ test "posix TZ string, leap year, America/Nuuk" {
     try testing.expectEqual(stdoff, result.offset(1603587600).offset);
 }
 
-test "posix TZ, valid strings" {
-    // from CPython's zoneinfo tests;
-    // https://github.com/python/cpython/blob/main/Lib/test/test_zoneinfo/test_zoneinfo.py
-    const tzstrs = [_][]const u8{
-        // Extreme offset hour
-        "AAA24",
-        "AAA+24",
-        "AAA-24",
-        "AAA24BBB,J60/2,J300/2",
-        "AAA+24BBB,J60/2,J300/2",
-        "AAA-24BBB,J60/2,J300/2",
-        "AAA4BBB24,J60/2,J300/2",
-        "AAA4BBB+24,J60/2,J300/2",
-        "AAA4BBB-24,J60/2,J300/2",
-        // Extreme offset minutes
-        "AAA4:00BBB,J60/2,J300/2",
-        "AAA4:59BBB,J60/2,J300/2",
-        "AAA4BBB5:00,J60/2,J300/2",
-        "AAA4BBB5:59,J60/2,J300/2",
-        // Extreme offset seconds
-        "AAA4:00:00BBB,J60/2,J300/2",
-        "AAA4:00:59BBB,J60/2,J300/2",
-        "AAA4BBB5:00:00,J60/2,J300/2",
-        "AAA4BBB5:00:59,J60/2,J300/2",
-        // Extreme total offset
-        "AAA24:59:59BBB5,J60/2,J300/2",
-        "AAA-24:59:59BBB5,J60/2,J300/2",
-        "AAA4BBB24:59:59,J60/2,J300/2",
-        "AAA4BBB-24:59:59,J60/2,J300/2",
-        // Extreme months
-        "AAA4BBB,M12.1.1/2,M1.1.1/2",
-        "AAA4BBB,M1.1.1/2,M12.1.1/2",
-        // Extreme weeks
-        "AAA4BBB,M1.5.1/2,M1.1.1/2",
-        "AAA4BBB,M1.1.1/2,M1.5.1/2",
-        // Extreme weekday
-        "AAA4BBB,M1.1.6/2,M2.1.1/2",
-        "AAA4BBB,M1.1.1/2,M2.1.6/2",
-        // Extreme numeric offset
-        "AAA4BBB,0/2,20/2",
-        "AAA4BBB,0/2,0/14",
-        "AAA4BBB,20/2,365/2",
-        "AAA4BBB,365/2,365/14",
-        // Extreme julian offset
-        "AAA4BBB,J1/2,J20/2",
-        "AAA4BBB,J1/2,J1/14",
-        "AAA4BBB,J20/2,J365/2",
-        "AAA4BBB,J365/2,J365/14",
-        // Extreme transition hour
-        "AAA4BBB,J60/167,J300/2",
-        "AAA4BBB,J60/+167,J300/2",
-        "AAA4BBB,J60/-167,J300/2",
-        "AAA4BBB,J60/2,J300/167",
-        "AAA4BBB,J60/2,J300/+167",
-        "AAA4BBB,J60/2,J300/-167",
-        // Extreme transition minutes
-        "AAA4BBB,J60/2:00,J300/2",
-        "AAA4BBB,J60/2:59,J300/2",
-        "AAA4BBB,J60/2,J300/2:00",
-        "AAA4BBB,J60/2,J300/2:59",
-        // Extreme transition seconds
-        "AAA4BBB,J60/2:00:00,J300/2",
-        "AAA4BBB,J60/2:00:59,J300/2",
-        "AAA4BBB,J60/2,J300/2:00:00",
-        "AAA4BBB,J60/2,J300/2:00:59",
-        // Extreme total transition time
-        "AAA4BBB,J60/167:59:59,J300/2",
-        "AAA4BBB,J60/-167:59:59,J300/2",
-        "AAA4BBB,J60/2,J300/167:59:59",
-        "AAA4BBB,J60/2,J300/-167:59:59",
-    };
-    for (tzstrs) |valid_str| {
-        _ = try parse(valid_str);
-    }
+test "posix TZ, valid strings, Extreme offset hour" {
+    _ = try parse("AAA24");
+    _ = try parse("AAA+24");
+    _ = try parse("AAA-24");
+    _ = try parse("AAA24BBB,J60/2,J300/2");
+    _ = try parse("AAA+24BBB,J60/2,J300/2");
+    _ = try parse("AAA-24BBB,J60/2,J300/2");
+    _ = try parse("AAA4BBB24,J60/2,J300/2");
+    _ = try parse("AAA4BBB+24,J60/2,J300/2");
+    _ = try parse("AAA4BBB-24,J60/2,J300/2");
+}
+
+test "posix TZ, valid strings, Extreme offset minutes" {
+    _ = try parse("AAA4:00BBB,J60/2,J300/2");
+    _ = try parse("AAA4:59BBB,J60/2,J300/2");
+    _ = try parse("AAA4BBB5:00,J60/2,J300/2");
+    _ = try parse("AAA4BBB5:59,J60/2,J300/2");
+}
+
+test "posix TZ, valid strings, Extreme offset seconds" {
+    _ = try parse("AAA4:00:00BBB,J60/2,J300/2");
+    _ = try parse("AAA4:00:59BBB,J60/2,J300/2");
+    _ = try parse("AAA4BBB5:00:00,J60/2,J300/2");
+    _ = try parse("AAA4BBB5:00:59,J60/2,J300/2");
+}
+
+test "posix TZ, valid strings, Extreme total offset" {
+    _ = try parse("AAA24:59:59BBB5,J60/2,J300/2");
+    _ = try parse("AAA-24:59:59BBB5,J60/2,J300/2");
+    _ = try parse("AAA4BBB24:59:59,J60/2,J300/2");
+    _ = try parse("AAA4BBB-24:59:59,J60/2,J300/2");
+}
+
+test "posix TZ, valid strings, Extreme months" {
+    _ = try parse("AAA4BBB,M12.1.1/2,M1.1.1/2");
+    _ = try parse("AAA4BBB,M1.1.1/2,M12.1.1/2");
+}
+
+test "posix TZ, valid strings, Extreme weeks" {
+    _ = try parse("AAA4BBB,M1.5.1/2,M1.1.1/2");
+    _ = try parse("AAA4BBB,M1.1.1/2,M1.5.1/2");
+}
+
+test "posix TZ, valid strings, Extreme weekday" {
+    _ = try parse("AAA4BBB,M1.1.6/2,M2.1.1/2");
+    _ = try parse("AAA4BBB,M1.1.1/2,M2.1.6/2");
+}
+
+test "posix TZ, valid strings, Extreme numeric offset" {
+    _ = try parse("AAA4BBB,0/2,20/2");
+    _ = try parse("AAA4BBB,0/2,0/14");
+    _ = try parse("AAA4BBB,20/2,365/2");
+    _ = try parse("AAA4BBB,365/2,365/14");
+}
+
+test "posix TZ, valid strings, Extreme julian offset" {
+    _ = try parse("AAA4BBB,J1/2,J20/2");
+    _ = try parse("AAA4BBB,J1/2,J1/14");
+    _ = try parse("AAA4BBB,J20/2,J365/2");
+    _ = try parse("AAA4BBB,J365/2,J365/14");
+}
+
+test "posix TZ, valid strings, Extreme transition hour" {
+    _ = try parse("AAA4BBB,J60/167,J300/2");
+    _ = try parse("AAA4BBB,J60/+167,J300/2");
+    _ = try parse("AAA4BBB,J60/-167,J300/2");
+    _ = try parse("AAA4BBB,J60/2,J300/167");
+    _ = try parse("AAA4BBB,J60/2,J300/+167");
+    _ = try parse("AAA4BBB,J60/2,J300/-167");
+}
+
+test "posix TZ, valid strings, Extreme transition minutes" {
+    _ = try parse("AAA4BBB,J60/2:00,J300/2");
+    _ = try parse("AAA4BBB,J60/2:59,J300/2");
+    _ = try parse("AAA4BBB,J60/2,J300/2:00");
+    _ = try parse("AAA4BBB,J60/2,J300/2:59");
+}
+
+test "posix TZ, valid strings, Extreme transition seconds" {
+    _ = try parse("AAA4BBB,J60/2:00:00,J300/2");
+    _ = try parse("AAA4BBB,J60/2:00:59,J300/2");
+    _ = try parse("AAA4BBB,J60/2,J300/2:00:00");
+    _ = try parse("AAA4BBB,J60/2,J300/2:00:59");
+}
+
+test "posix TZ, valid strings, Extreme total transition time" {
+    _ = try parse("AAA4BBB,J60/167:59:59,J300/2");
+    _ = try parse("AAA4BBB,J60/-167:59:59,J300/2");
+    _ = try parse("AAA4BBB,J60/2,J300/167:59:59");
+    _ = try parse("AAA4BBB,J60/2,J300/-167:59:59");
 }
 
 // The following tests are from CPython's zoneinfo tests;
@@ -1203,3 +1243,7 @@ test "posix TZ AAA3BBB,M3.2.0/01:30,M11.1.0/02:15:45 from zoneinfo_test.py" {
     try testing.expectEqual(@as(i32, -10800), result.offset(1352002545).offset); // 2012-11-04T01:15:45-03:00
     try testing.expectEqual(@as(i32, -10800), result.offset(1352006145).offset); // 2012-11-04T02:15:45-03:00
 }
+
+const chrono = @import("../lib.zig");
+const testing = @import("std").testing;
+const std = @import("std");

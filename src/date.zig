@@ -246,6 +246,8 @@ pub const Weekday = enum(u3) {
     sat = 5,
     sun = 6,
 
+    pub const COUNT = @as(comptime_int, WEEKDAYS.len);
+
     pub fn fullName(this: @This()) []const u8 {
         return switch (this) {
             .mon => "Monday",
@@ -366,6 +368,41 @@ pub const Weekday = enum(u3) {
         try std.testing.expectEqual(@as(Weekday, .thu), prev(.fri));
         try std.testing.expectEqual(@as(Weekday, .fri), prev(.sat));
     }
+
+    /// Convert the weekday to an integer, with Monday as day 0
+    pub fn toIntMon0(this: @This()) u3 {
+        return @intFromEnum(this);
+    }
+
+    /// Convert the weekday to an integer, with Sunday as 0
+    pub fn toIntSun0(this: @This()) u3 {
+        return @intCast((@as(u4, @intFromEnum(this)) + COUNT + 1) % COUNT);
+    }
+
+    test toIntSun0 {
+        try std.testing.expectEqual(@as(u3, 0), toIntSun0(.sun));
+        try std.testing.expectEqual(@as(u3, 1), toIntSun0(.mon));
+        try std.testing.expectEqual(@as(u3, 2), toIntSun0(.tue));
+        try std.testing.expectEqual(@as(u3, 3), toIntSun0(.wed));
+        try std.testing.expectEqual(@as(u3, 4), toIntSun0(.thu));
+        try std.testing.expectEqual(@as(u3, 5), toIntSun0(.fri));
+        try std.testing.expectEqual(@as(u3, 6), toIntSun0(.sat));
+    }
+
+    /// Convert the weekday to an integer, with Sunday as 0
+    pub fn fromIntSun0(int: u3) @This() {
+        return @enumFromInt((@as(u4, int) + COUNT - 1) % COUNT);
+    }
+
+    test fromIntSun0 {
+        try std.testing.expectEqual(@This().sun, fromIntSun0(0));
+        try std.testing.expectEqual(@This().mon, fromIntSun0(1));
+        try std.testing.expectEqual(@This().tue, fromIntSun0(2));
+        try std.testing.expectEqual(@This().wed, fromIntSun0(3));
+        try std.testing.expectEqual(@This().thu, fromIntSun0(4));
+        try std.testing.expectEqual(@This().fri, fromIntSun0(5));
+        try std.testing.expectEqual(@This().sat, fromIntSun0(6));
+    }
 };
 
 pub const MONTHS = [_]Month{
@@ -383,7 +420,7 @@ pub const MONTHS = [_]Month{
     .dec,
 };
 
-pub const Month = enum(Month.Int) {
+pub const Month = enum(u4) {
     jan = 1,
     feb,
     mar,
@@ -448,6 +485,34 @@ pub const Month = enum(Month.Int) {
 
     pub const LAST_DAY_OF_MONTH_COMMON_YEAR = [12]DayInt{ 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
     pub const LAST_DAY_OF_MONTH_LEAP_YEAR = [12]DayInt{ 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+
+    /// Returns the day of the year that this months starts at. Return value is in the range [0, 334]
+    pub fn firstDayOfYear(month: Month, year: i32) u9 {
+        if (@intFromEnum(month) <= @intFromEnum(Month.feb) or !isLeapYear(year)) {
+            return FIRST_DAY_OF_COMMON_YEAR[@intFromEnum(month) - 1];
+        } else {
+            return FIRST_DAY_OF_LEAP_YEAR[@intFromEnum(month) - 1];
+        }
+    }
+
+    pub const FIRST_DAY_OF_COMMON_YEAR = calc_days_into_year: {
+        var months_days_into_year: [LAST_DAY_OF_MONTH_COMMON_YEAR.len]u9 = undefined;
+        months_days_into_year[0] = 0;
+        for (months_days_into_year[0..11], LAST_DAY_OF_MONTH_COMMON_YEAR[0..11], months_days_into_year[1..12]) |days_into_year_prev_month, last_day_of_prev_month, *days_into_year| {
+            days_into_year.* = days_into_year_prev_month + last_day_of_prev_month;
+        }
+
+        break :calc_days_into_year months_days_into_year;
+    };
+    pub const FIRST_DAY_OF_LEAP_YEAR = calc_days_into_year: {
+        var months_days_into_year: [LAST_DAY_OF_MONTH_LEAP_YEAR.len]u9 = undefined;
+        months_days_into_year[0] = 0;
+        for (months_days_into_year[0..11], LAST_DAY_OF_MONTH_LEAP_YEAR[0..11], months_days_into_year[1..12]) |days_into_year_prev_month, last_day_of_prev_month, *days_into_year| {
+            days_into_year.* = days_into_year_prev_month + last_day_of_prev_month;
+        }
+
+        break :calc_days_into_year months_days_into_year;
+    };
 };
 
 pub fn isLeapYear(year: i32) bool {
