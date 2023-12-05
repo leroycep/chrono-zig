@@ -1,6 +1,10 @@
 # Zig Chrono
 
-A Zig port of the Rust crate [`chrono`][]. Built with Zig version
-`0.11.0`.
+This originally was a Zig port of the Rust crate [`chrono`][]. It now uses [Howard Hinnant's `chrono`
+compatible date algorithms][date_algorithms]. 
+
+- Requires Zig `0.11.0`
 
 [`chrono`]: https://github.com/chronotope/chrono
+[date_algorithms]: https://howardhinnant.github.io/date_algorithms.html
+
