@@ -94,6 +94,19 @@ pub const YearMonthDay = packed struct(i32) {
             .day = @intCast(day_of_month),
         };
     }
+
+    pub fn format(
+        this: @This(),
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = fmt;
+        _ = options;
+        const sign_str = if (this.year < 0) "-" else "";
+
+        try std.fmt.format(writer, "{s}{:0>4}-{:0>2}-{:0>2}", .{ sign_str, std.math.absCast(this.year), @intFromEnum(this.month), this.day });
+    }
 };
 
 fn leapDaysSinceEraBegan(day_of_era: u24) u24 {
