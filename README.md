@@ -8,3 +8,4 @@ compatible date algorithms][date_algorithms].
 [`chrono`]: https://github.com/chronotope/chrono
 [date_algorithms]: https://howardhinnant.github.io/date_algorithms.html
 
+You can find the git repository at <https://codeberg.org/geemili/chrono-zig>.
