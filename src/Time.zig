@@ -152,27 +152,27 @@ pub const FracInt = @Type(.{
 
 test "time hour, minute, second" {
     try std.testing.expectEqual(@as(HoursInt, 3), (try Time.hms(3, 5, 7)).hour());
-    try std.testing.expectEqual((try Time.hms(0, 5, 7)), (try (try Time.hms(3, 5, 7)).with_hour(0)));
-    try std.testing.expectEqual((try Time.hms(23, 5, 7)), (try (try Time.hms(3, 5, 7)).with_hour(23)));
-    try std.testing.expectError(error.InvalidTime, (try Time.hms(3, 5, 7)).with_hour(24));
-    try std.testing.expectError(error.InvalidTime, (try Time.hms(3, 5, 7)).with_hour(std.math.maxInt(HoursInt)));
+    try std.testing.expectEqual((try Time.hms(0, 5, 7)), (try (try Time.hms(3, 5, 7)).withHour(0)));
+    try std.testing.expectEqual((try Time.hms(23, 5, 7)), (try (try Time.hms(3, 5, 7)).withHour(23)));
+    try std.testing.expectError(error.InvalidTime, (try Time.hms(3, 5, 7)).withHour(24));
+    try std.testing.expectError(error.InvalidTime, (try Time.hms(3, 5, 7)).withHour(std.math.maxInt(HoursInt)));
 
     try std.testing.expectEqual(@as(MinutesInt, 5), (try Time.hms(3, 5, 7)).minute());
-    try std.testing.expectEqual((try Time.hms(3, 0, 7)), try (try Time.hms(3, 5, 7)).with_minute(0));
-    try std.testing.expectEqual((try Time.hms(3, 59, 7)), try (try Time.hms(3, 5, 7)).with_minute(59));
-    try std.testing.expectError(error.InvalidTime, (try Time.hms(3, 5, 7)).with_minute(60));
-    try std.testing.expectError(error.InvalidTime, (try Time.hms(3, 5, 7)).with_minute(std.math.maxInt(MinutesInt)));
+    try std.testing.expectEqual((try Time.hms(3, 0, 7)), try (try Time.hms(3, 5, 7)).withMinute(0));
+    try std.testing.expectEqual((try Time.hms(3, 59, 7)), try (try Time.hms(3, 5, 7)).withMinute(59));
+    try std.testing.expectError(error.InvalidTime, (try Time.hms(3, 5, 7)).withMinute(60));
+    try std.testing.expectError(error.InvalidTime, (try Time.hms(3, 5, 7)).withMinute(std.math.maxInt(MinutesInt)));
 
     try std.testing.expectEqual(@as(MinutesInt, 7), (try Time.hms(3, 5, 7)).second());
-    try std.testing.expectEqual((try Time.hms(3, 5, 0)), try (try Time.hms(3, 5, 7)).with_second(0));
-    try std.testing.expectEqual((try Time.hms(3, 5, 59)), try (try Time.hms(3, 5, 7)).with_second(59));
-    try std.testing.expectError(error.InvalidTime, (try Time.hms(3, 5, 7)).with_second(60));
-    try std.testing.expectError(error.InvalidTime, (try Time.hms(3, 5, 7)).with_second(std.math.maxInt(MinutesInt)));
+    try std.testing.expectEqual((try Time.hms(3, 5, 0)), try (try Time.hms(3, 5, 7)).withSecond(0));
+    try std.testing.expectEqual((try Time.hms(3, 5, 59)), try (try Time.hms(3, 5, 7)).withSecond(59));
+    try std.testing.expectError(error.InvalidTime, (try Time.hms(3, 5, 7)).withSecond(60));
+    try std.testing.expectError(error.InvalidTime, (try Time.hms(3, 5, 7)).withSecond(std.math.maxInt(MinutesInt)));
 }
 
 test "time signed duration since" {
-    try std.testing.expectEqual(@as(i64, 3600), (try hms(23, 0, 0)).signed_duration_since((try hms(22, 0, 0))));
-    try std.testing.expectEqual(@as(i64, 79_200), (try hms(22, 0, 0)).signed_duration_since((try hms(0, 0, 0))));
+    try std.testing.expectEqual(@as(i64, 3600), (try hms(23, 0, 0)).signedDurationSince((try hms(22, 0, 0))));
+    try std.testing.expectEqual(@as(i64, 79_200), (try hms(22, 0, 0)).signedDurationSince((try hms(0, 0, 0))));
 }
 
 const min_per_hour = std.time.s_per_hour / std.time.s_per_min;
