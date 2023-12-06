@@ -10,6 +10,8 @@ pub fn build(b: *Builder) void {
         .source_file = .{ .path = "src/lib.zig" },
     });
 
+    const check_step = b.step("check", "Run tests and build examples");
+
     const test_exe = b.addTest(.{
         .root_source_file = .{ .path = "src/lib.zig" },
         .target = target,
@@ -21,12 +23,15 @@ pub fn build(b: *Builder) void {
     const run_tests_step = b.step("test", "Test everything");
     run_tests_step.dependOn(&run_tests.step);
 
+    check_step.dependOn(&run_tests.step);
+
     addExample(b, .{
         .name = "print-local-datetime",
         .target = target,
         .optimize = optimize,
         .chrono = chrono,
         .should_install = should_install_examples,
+        .check_step = check_step,
     });
 }
 
@@ -36,6 +41,7 @@ const ExampleOptions = struct {
     optimize: std.builtin.OptimizeMode,
     chrono: *std.Build.Module,
     should_install: bool,
+    check_step: ?*std.Build.Step,
 };
 pub fn addExample(b: *Builder, options: ExampleOptions) void {
     const exe = b.addExecutable(.{
@@ -46,6 +52,9 @@ pub fn addExample(b: *Builder, options: ExampleOptions) void {
     });
     exe.addModule("chrono", options.chrono);
 
+    if (options.check_step) |check_step| {
+        check_step.dependOn(&exe.step);
+    }
     if (options.should_install) {
         b.installArtifact(exe);
     }
