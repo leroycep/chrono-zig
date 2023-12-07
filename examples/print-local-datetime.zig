@@ -6,19 +6,20 @@ pub fn main() !void {
     defer _ = gpa_allocator.deinit();
     const gpa = gpa_allocator.allocator();
 
-    // TODO: create cross platform API to get the local timezone
-    const timezone = try chrono.tz.TZif.parseFile(gpa, "/etc/localtime");
-    defer timezone.deinit();
+    var tzdb = try chrono.tz.DataBase.init(gpa);
+    defer tzdb.deinit();
+
+    const timezone = try tzdb.getLocalTimeZone(gpa);
 
     const timestamp_utc = std.time.timestamp();
-    const conversion_to_local = timezone.localTimeFromUTC(timestamp_utc) orelse {
+    const local_offset = timezone.offsetAtTimestamp(timestamp_utc) orelse {
         std.debug.print("Could not convert the current time to local time.", .{});
         return error.ConversionFailed;
     };
-    const timestamp_local = conversion_to_local.timestamp;
+    const timestamp_local = timestamp_utc + local_offset.offset;
 
     const date = chrono.date.YearMonthDay.fromDaysSinceUnixEpoch(@intCast(@divFloor(timestamp_local, std.time.s_per_day)));
     const time = chrono.Time{ .secs = @intCast(@mod(timestamp_local, std.time.s_per_day)), .frac = 0 };
 
-    std.debug.print("The current date is {}, and the time is {} in the {s} timezone", .{ date, time, conversion_to_local.designation });
+    std.debug.print("The current date is {}, and the time is {} in the {s} timezone", .{ date, time, local_offset.designation });
 }

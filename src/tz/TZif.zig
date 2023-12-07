@@ -1,125 +1,129 @@
-const std = @import("std");
-const testing = std.testing;
-const Posix = @import("./Posix.zig");
+allocator: std.mem.Allocator,
+version: Version,
+transitionTimes: []i64,
+transitionTypes: []u8,
+localTimeTypes: []LocalTimeType,
+designations: []u8,
+leapSeconds: []LeapSecond,
+transitionIsStd: []bool,
+transitionIsUT: []bool,
+string: []u8,
+posixTZ: ?Posix,
 
-const log = std.log.scoped(.tzif);
+const TZif = @This();
 
-pub const TimeZone = struct {
-    allocator: std.mem.Allocator,
-    version: Version,
-    transitionTimes: []i64,
-    transitionTypes: []u8,
-    localTimeTypes: []LocalTimeType,
-    designations: []u8,
-    leapSeconds: []LeapSecond,
-    transitionIsStd: []bool,
-    transitionIsUT: []bool,
-    string: []u8,
-    posixTZ: ?Posix,
+pub fn deinit(this: *@This()) void {
+    this.allocator.free(this.transitionTimes);
+    this.allocator.free(this.transitionTypes);
+    this.allocator.free(this.localTimeTypes);
+    this.allocator.free(this.designations);
+    this.allocator.free(this.leapSeconds);
+    this.allocator.free(this.transitionIsStd);
+    this.allocator.free(this.transitionIsUT);
+    this.allocator.free(this.string);
+}
 
-    pub fn deinit(this: @This()) void {
-        this.allocator.free(this.transitionTimes);
-        this.allocator.free(this.transitionTypes);
-        this.allocator.free(this.localTimeTypes);
-        this.allocator.free(this.designations);
-        this.allocator.free(this.leapSeconds);
-        this.allocator.free(this.transitionIsStd);
-        this.allocator.free(this.transitionIsUT);
-        this.allocator.free(this.string);
-    }
+pub const TIMEZONE_VTABLE = chrono.tz.TimeZone.VTable.eraseTypes(@This(), .{
+    .offsetAtTimestamp = offsetAtTimestamp,
+});
 
-    pub const ConversionResult = struct {
-        timestamp: i64,
-        offset: i32,
-        is_daylight_saving_time: bool,
-        designation: []const u8,
+pub fn timeZone(this: *@This()) chrono.tz.TimeZone {
+    return chrono.tz.TimeZone{
+        .ptr = this,
+        .vtable = &TIMEZONE_VTABLE,
     };
+}
 
-    pub fn localTimeFromUTC(this: @This(), utc: i64) ?ConversionResult {
-        const transition_type_by_timestamp = getTransitionTypeByTimestamp(this.transitionTimes, utc);
-        switch (transition_type_by_timestamp) {
-            .first_local_time_type => {
-                const local_time_type = this.localTimeTypes[0];
+pub fn offsetAtTimestamp(this: *const @This(), utc: i64) ?chrono.tz.TimeZone.Offset {
+    const transition_type_by_timestamp = getTransitionTypeByTimestamp(this.transitionTimes, utc);
+    switch (transition_type_by_timestamp) {
+        .first_local_time_type => {
+            const local_time_type = this.localTimeTypes[0];
 
-                var designation = this.designations[local_time_type.designation_index .. this.designations.len - 1];
-                for (designation, 0..) |c, i| {
-                    if (c == 0) {
-                        designation = designation[0..i];
-                        break;
-                    }
+            var designation = this.designations[local_time_type.designation_index .. this.designations.len - 1];
+            for (designation, 0..) |c, i| {
+                if (c == 0) {
+                    designation = designation[0..i];
+                    break;
                 }
+            }
 
-                return ConversionResult{
-                    .timestamp = utc + local_time_type.ut_offset,
-                    .offset = local_time_type.ut_offset,
-                    .is_daylight_saving_time = local_time_type.is_daylight_saving_time,
-                    .designation = designation,
-                };
-            },
-            .transition_index => |transition_index| {
-                const local_time_type_idx = this.transitionTypes[transition_index];
-                const local_time_type = this.localTimeTypes[local_time_type_idx];
+            return chrono.tz.TimeZone.Offset{
+                .offset = local_time_type.ut_offset,
+                .is_daylight_saving_time = local_time_type.is_daylight_saving_time,
+                .designation = designation,
+            };
+        },
+        .transition_index => |transition_index| {
+            const local_time_type_idx = this.transitionTypes[transition_index];
+            const local_time_type = this.localTimeTypes[local_time_type_idx];
 
-                var designation = this.designations[local_time_type.designation_index .. this.designations.len - 1];
-                for (designation, 0..) |c, i| {
-                    if (c == 0) {
-                        designation = designation[0..i];
-                        break;
-                    }
+            var designation = this.designations[local_time_type.designation_index .. this.designations.len - 1];
+            for (designation, 0..) |c, i| {
+                if (c == 0) {
+                    designation = designation[0..i];
+                    break;
                 }
+            }
 
-                return ConversionResult{
-                    .timestamp = utc + local_time_type.ut_offset,
-                    .offset = local_time_type.ut_offset,
-                    .is_daylight_saving_time = local_time_type.is_daylight_saving_time,
-                    .designation = designation,
-                };
-            },
-            .specified_by_posix_tz,
-            .specified_by_posix_tz_or_index_0,
-            => if (this.posixTZ) |posixTZ| {
-                // Base offset on the TZ string
-                const offset_res = posixTZ.offset(utc);
-                return ConversionResult{
-                    .timestamp = utc + offset_res.offset,
-                    .offset = offset_res.offset,
-                    .is_daylight_saving_time = offset_res.is_daylight_saving_time,
-                    .designation = offset_res.designation,
-                };
-            } else {
-                switch (transition_type_by_timestamp) {
-                    .specified_by_posix_tz => return null,
-                    .specified_by_posix_tz_or_index_0 => {
-                        const local_time_type = this.localTimeTypes[0];
+            return chrono.tz.TimeZone.Offset{
+                .offset = local_time_type.ut_offset,
+                .is_daylight_saving_time = local_time_type.is_daylight_saving_time,
+                .designation = designation,
+            };
+        },
+        .specified_by_posix_tz,
+        .specified_by_posix_tz_or_index_0,
+        => if (this.posixTZ) |posixTZ| {
+            // Base offset on the TZ string
+            const offset_res = posixTZ.offsetAtTimestamp(utc) orelse return null;
+            return chrono.tz.TimeZone.Offset{
+                .offset = offset_res.offset,
+                .is_daylight_saving_time = offset_res.is_daylight_saving_time,
+                .designation = offset_res.designation,
+            };
+        } else {
+            switch (transition_type_by_timestamp) {
+                .specified_by_posix_tz => return null,
+                .specified_by_posix_tz_or_index_0 => {
+                    const local_time_type = this.localTimeTypes[0];
 
-                        var designation = this.designations[local_time_type.designation_index .. this.designations.len - 1];
-                        for (designation, 0..) |c, i| {
-                            if (c == 0) {
-                                designation = designation[0..i];
-                                break;
-                            }
+                    var designation = this.designations[local_time_type.designation_index .. this.designations.len - 1];
+                    for (designation, 0..) |c, i| {
+                        if (c == 0) {
+                            designation = designation[0..i];
+                            break;
                         }
+                    }
 
-                        return ConversionResult{
-                            .timestamp = utc + local_time_type.ut_offset,
-                            .offset = local_time_type.ut_offset,
-                            .is_daylight_saving_time = local_time_type.is_daylight_saving_time,
-                            .designation = designation,
-                        };
-                    },
-                    else => unreachable,
-                }
-            },
-        }
+                    return chrono.tz.TimeZone.Offset{
+                        .offset = local_time_type.ut_offset,
+                        .is_daylight_saving_time = local_time_type.is_daylight_saving_time,
+                        .designation = designation,
+                    };
+                },
+                else => unreachable,
+            }
+        },
     }
+}
 
-    pub fn localTimeToUTC(this: @This(), localtime: i64) ?ConversionResult {
-        _ = this;
-        _ = localtime;
-        std.debug.panic("Unimplemented", .{});
-        return null;
-    }
+pub const ConversionResult = struct {
+    timestamp: i64,
+    offset: i32,
+    is_daylight_saving_time: bool,
+    designation: []const u8,
 };
+
+pub fn localTimeFromUTC(this: @This(), utc: i64) ?ConversionResult {
+    const offset = this.offsetAtTimestamp(utc) orelse return null;
+    return ConversionResult{
+        .timestamp = utc + offset.offset,
+        .offset = offset.offset,
+        .is_daylight_saving_time = offset.is_daylight_saving_time,
+        .designation = offset.designation,
+    };
+}
 
 pub const Version = enum(u8) {
     V1 = 0,
@@ -179,7 +183,7 @@ pub const LeapSecond = struct {
 
 const TIME_TYPE_SIZE = 6;
 
-pub const TZifHeader = struct {
+pub const Header = struct {
     version: Version,
     isutcnt: u32,
     isstdcnt: u32,
@@ -197,44 +201,44 @@ pub const TZifHeader = struct {
             this.isstdcnt +
             this.isutcnt;
     }
+
+    pub fn parse(reader: anytype, seekableStream: anytype) !Header {
+        var magic_buf: [4]u8 = undefined;
+        try reader.readNoEof(&magic_buf);
+        if (!std.mem.eql(u8, "TZif", &magic_buf)) {
+            log.warn("File is missing magic string 'TZif'", .{});
+            return error.InvalidFormat;
+        }
+
+        // Check verison
+        const version = reader.readEnum(Version, .Little) catch |err| switch (err) {
+            error.InvalidValue => return error.UnsupportedVersion,
+            else => |e| return e,
+        };
+        if (version == .V1) {
+            return error.UnsupportedVersion;
+        }
+
+        // Seek past reserved bytes
+        try seekableStream.seekBy(15);
+
+        return Header{
+            .version = version,
+            .isutcnt = try reader.readInt(u32, .Big),
+            .isstdcnt = try reader.readInt(u32, .Big),
+            .leapcnt = try reader.readInt(u32, .Big),
+            .timecnt = try reader.readInt(u32, .Big),
+            .typecnt = try reader.readInt(u32, .Big),
+            .charcnt = try reader.readInt(u32, .Big),
+        };
+    }
 };
 
-pub fn parseHeader(reader: anytype, seekableStream: anytype) !TZifHeader {
-    var magic_buf: [4]u8 = undefined;
-    try reader.readNoEof(&magic_buf);
-    if (!std.mem.eql(u8, "TZif", &magic_buf)) {
-        log.warn("File is missing magic string 'TZif'", .{});
-        return error.InvalidFormat;
-    }
-
-    // Check verison
-    const version = reader.readEnum(Version, .Little) catch |err| switch (err) {
-        error.InvalidValue => return error.UnsupportedVersion,
-        else => |e| return e,
-    };
-    if (version == .V1) {
-        return error.UnsupportedVersion;
-    }
-
-    // Seek past reserved bytes
-    try seekableStream.seekBy(15);
-
-    return TZifHeader{
-        .version = version,
-        .isutcnt = try reader.readInt(u32, .Big),
-        .isstdcnt = try reader.readInt(u32, .Big),
-        .leapcnt = try reader.readInt(u32, .Big),
-        .timecnt = try reader.readInt(u32, .Big),
-        .typecnt = try reader.readInt(u32, .Big),
-        .charcnt = try reader.readInt(u32, .Big),
-    };
-}
-
-pub fn parse(allocator: std.mem.Allocator, reader: anytype, seekableStream: anytype) !TimeZone {
-    const v1_header = try parseHeader(reader, seekableStream);
+pub fn parse(allocator: std.mem.Allocator, reader: anytype, seekableStream: anytype) !TZif {
+    const v1_header = try Header.parse(reader, seekableStream);
     try seekableStream.seekBy(v1_header.dataSize(.V1));
 
-    const v2_header = try parseHeader(reader, seekableStream);
+    const v2_header = try Header.parse(reader, seekableStream);
 
     // Parse transition times
     var transition_times = try allocator.alloc(i64, v2_header.timecnt);
@@ -351,7 +355,7 @@ pub fn parse(allocator: std.mem.Allocator, reader: anytype, seekableStream: anyt
     else
         null;
 
-    return TimeZone{
+    return TZif{
         .allocator = allocator,
         .version = v2_header.version,
         .transitionTimes = transition_times,
@@ -366,7 +370,7 @@ pub fn parse(allocator: std.mem.Allocator, reader: anytype, seekableStream: anyt
     };
 }
 
-pub fn parseFile(allocator: std.mem.Allocator, path: []const u8) !TimeZone {
+pub fn parseFile(allocator: std.mem.Allocator, path: []const u8) !TZif {
     const cwd = std.fs.cwd();
 
     const file = try cwd.openFile(path, .{});
@@ -466,7 +470,7 @@ test "parse invalid bytes" {
 test "parse UTC zoneinfo" {
     var fbs = std.io.fixedBufferStream(@embedFile("zoneinfo/UTC"));
 
-    const res = try parse(std.testing.allocator, fbs.reader(), fbs.seekableStream());
+    var res = try parse(std.testing.allocator, fbs.reader(), fbs.seekableStream());
     defer res.deinit();
 
     try testing.expectEqual(Version.V2, res.version);
@@ -494,7 +498,7 @@ test "parse Pacific/Honolulu zoneinfo and calculate local times" {
 
     var fbs = std.io.fixedBufferStream(@embedFile("zoneinfo/Pacific/Honolulu"));
 
-    const res = try parse(std.testing.allocator, fbs.reader(), fbs.seekableStream());
+    var res = try parse(std.testing.allocator, fbs.reader(), fbs.seekableStream());
     defer res.deinit();
 
     try testing.expectEqual(Version.V2, res.version);
@@ -542,3 +546,10 @@ test "parse Pacific/Honolulu zoneinfo and calculate local times" {
         try testing.expectEqualSlices(u8, "HST", conversion.designation);
     }
 }
+
+const log = std.log.scoped(.tzif);
+
+const chrono = @import("../lib.zig");
+const Posix = @import("./Posix.zig");
+const testing = std.testing;
+const std = @import("std");

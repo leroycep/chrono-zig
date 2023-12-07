@@ -162,14 +162,19 @@ pub const Rule = union(enum) {
     }
 };
 
-pub const OffsetResult = struct {
-    offset: i32,
-    designation: []const u8,
-    is_daylight_saving_time: bool,
-};
+pub const TIMEZONE_VTABLE = chrono.tz.TimeZone.VTable.eraseTypes(@This(), .{
+    .offsetAtTimestamp = offsetAtTimestamp,
+});
+
+pub fn timeZone(this: *const @This()) chrono.tz.TimeZone {
+    return chrono.tz.TimeZone{
+        .ptr = this,
+        .vtable = &TIMEZONE_VTABLE,
+    };
+}
 
 /// Get the offset from UTC for this TZ, factoring in Daylight Saving Time.
-pub fn offset(this: @This(), timestamp: i64) OffsetResult {
+pub fn offsetAtTimestamp(this: *const @This(), timestamp: i64) ?chrono.tz.TimeZone.Offset {
     const dst_designation = this.dst_designation orelse {
         std.debug.assert(this.dst_range == null);
         return .{ .offset = this.std_offset, .designation = this.std_designation, .is_daylight_saving_time = false };
@@ -539,16 +544,16 @@ test "posix TZ string, regular year" {
     try testing.expectEqual(dstoff, result.dst_offset);
     try testing.expectEqual(TZ.Rule{ .MonthNthWeekday = .{ .month = .mar, .n = 2, .weekday = .sun, .time = chrono.duration.HoursMinutesSeconds.new(2, 0, 0) } }, result.dst_range.?.start);
     try testing.expectEqual(TZ.Rule{ .MonthNthWeekday = .{ .month = .nov, .n = 1, .weekday = .sun, .time = chrono.duration.HoursMinutesSeconds.new(2, 0, 0) } }, result.dst_range.?.end);
-    try testing.expectEqual(stdoff, result.offset(1612734960).offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1612734960).?.offset);
     // 2021-03-14T01:59:59-07:00 (2nd Sunday of the 3rd month, MST)
-    try testing.expectEqual(stdoff, result.offset(1615712399).offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1615712399).?.offset);
     // 2021-03-14T02:00:00-07:00 (2nd Sunday of the 3rd month, MST)
-    try testing.expectEqual(dstoff, result.offset(1615712400).offset);
-    try testing.expectEqual(dstoff, result.offset(1620453601).offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1615712400).?.offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1620453601).?.offset);
     // 2021-11-07T01:59:59-06:00 (1st Sunday of the 11th month, MDT)
-    try testing.expectEqual(dstoff, result.offset(1636271999).offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1636271999).?.offset);
     // 2021-11-07T02:00:00-06:00 (1st Sunday of the 11th month, MDT)
-    try testing.expectEqual(stdoff, result.offset(1636272000).offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1636272000).?.offset);
 
     // IANA identifier: Europe/Berlin
     result = try parse("CET-1CEST,M3.5.0,M10.5.0/3");
@@ -561,9 +566,9 @@ test "posix TZ string, regular year" {
     try testing.expectEqual(TZ.Rule{ .MonthNthWeekday = .{ .month = .mar, .n = 5, .weekday = .sun, .time = chrono.duration.HoursMinutesSeconds.new(2, 0, 0) } }, result.dst_range.?.start);
     try testing.expectEqual(TZ.Rule{ .MonthNthWeekday = .{ .month = .oct, .n = 5, .weekday = .sun, .time = chrono.duration.HoursMinutesSeconds.new(3, 0, 0) } }, result.dst_range.?.end);
     // 2023-10-29T00:59:59Z, or 2023-10-29 01:59:59 CEST. Offset should still be CEST.
-    try testing.expectEqual(dstoff, result.offset(1698541199).offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1698541199).?.offset);
     // 2023-10-29T01:00:00Z, or 2023-10-29 03:00:00 CEST. Offset should now be CET.
-    try testing.expectEqual(stdoff, result.offset(1698541200).offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1698541200).?.offset);
 
     // IANA identifier: America/New_York
     result = try parse("EST5EDT,M3.2.0/02:00:00,M11.1.0");
@@ -574,11 +579,11 @@ test "posix TZ string, regular year" {
     try testing.expectEqualSlices(u8, "EDT", result.dst_designation.?);
     try testing.expectEqual(dstoff, result.dst_offset);
     // transition std 2023-03-12T01:59:59-05:00 --> dst 2023-03-12T03:00:00-04:00
-    try testing.expectEqual(stdoff, result.offset(1678604399).offset);
-    try testing.expectEqual(dstoff, result.offset(1678604400).offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1678604399).?.offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1678604400).?.offset);
     // transition dst 2023-11-05T01:59:59-04:00 --> std 2023-11-05T01:00:00-05:00
-    try testing.expectEqual(dstoff, result.offset(1699163999).offset);
-    try testing.expectEqual(stdoff, result.offset(1699164000).offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1699163999).?.offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1699164000).?.offset);
 
     // IANA identifier: America/New_York
     result = try parse("EST5EDT,M3.2.0/02:00:00,M11.1.0/02:00:00");
@@ -589,11 +594,11 @@ test "posix TZ string, regular year" {
     try testing.expectEqualSlices(u8, "EDT", result.dst_designation.?);
     try testing.expectEqual(dstoff, result.dst_offset);
     // transition std 2023-03-12T01:59:59-05:00 --> dst 2023-03-12T03:00:00-04:00
-    try testing.expectEqual(stdoff, result.offset(1678604399).offset);
-    try testing.expectEqual(dstoff, result.offset(1678604400).offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1678604399).?.offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1678604400).?.offset);
     // transition dst 2023-11-05T01:59:59-04:00 --> std 2023-11-05T01:00:00-05:00
-    try testing.expectEqual(dstoff, result.offset(1699163999).offset);
-    try testing.expectEqual(stdoff, result.offset(1699164000).offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1699163999).?.offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1699164000).?.offset);
 
     // IANA identifier: America/New_York
     result = try parse("EST5EDT,M3.2.0,M11.1.0/02:00:00");
@@ -604,11 +609,11 @@ test "posix TZ string, regular year" {
     try testing.expectEqualSlices(u8, "EDT", result.dst_designation.?);
     try testing.expectEqual(dstoff, result.dst_offset);
     // transition std 2023-03-12T01:59:59-05:00 --> dst 2023-03-12T03:00:00-04:00
-    try testing.expectEqual(stdoff, result.offset(1678604399).offset);
-    try testing.expectEqual(dstoff, result.offset(1678604400).offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1678604399).?.offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1678604400).?.offset);
     // transition dst 2023-11-05T01:59:59-04:00 --> std 2023-11-05T01:00:00-05:00
-    try testing.expectEqual(dstoff, result.offset(1699163999).offset);
-    try testing.expectEqual(stdoff, result.offset(1699164000).offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1699163999).?.offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1699164000).?.offset);
 
     // IANA identifier: America/Chicago
     result = try parse("CST6CDT,M3.2.0/2:00:00,M11.1.0/2:00:00");
@@ -619,11 +624,11 @@ test "posix TZ string, regular year" {
     try testing.expectEqualSlices(u8, "CDT", result.dst_designation.?);
     try testing.expectEqual(dstoff, result.dst_offset);
     // transition std 2023-03-12T01:59:59-06:00 --> dst 2023-03-12T03:00:00-05:00
-    try testing.expectEqual(stdoff, result.offset(1678607999).offset);
-    try testing.expectEqual(dstoff, result.offset(1678608000).offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1678607999).?.offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1678608000).?.offset);
     // transition dst 2023-11-05T01:59:59-05:00 --> std 2023-11-05T01:00:00-06:00
-    try testing.expectEqual(dstoff, result.offset(1699167599).offset);
-    try testing.expectEqual(stdoff, result.offset(1699167600).offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1699167599).?.offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1699167600).?.offset);
 
     // IANA identifier: America/Denver
     result = try parse("MST7MDT,M3.2.0/2:00:00,M11.1.0/2:00:00");
@@ -634,11 +639,11 @@ test "posix TZ string, regular year" {
     try testing.expectEqualSlices(u8, "MDT", result.dst_designation.?);
     try testing.expectEqual(dstoff, result.dst_offset);
     // transition std 2023-03-12T01:59:59-07:00 --> dst 2023-03-12T03:00:00-06:00
-    try testing.expectEqual(stdoff, result.offset(1678611599).offset);
-    try testing.expectEqual(dstoff, result.offset(1678611600).offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1678611599).?.offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1678611600).?.offset);
     // transition dst 2023-11-05T01:59:59-06:00 --> std 2023-11-05T01:00:00-07:00
-    try testing.expectEqual(dstoff, result.offset(1699171199).offset);
-    try testing.expectEqual(stdoff, result.offset(1699171200).offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1699171199).?.offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1699171200).?.offset);
 
     // IANA identifier: America/Los_Angeles
     result = try parse("PST8PDT,M3.2.0/2:00:00,M11.1.0/2:00:00");
@@ -649,11 +654,11 @@ test "posix TZ string, regular year" {
     try testing.expectEqualSlices(u8, "PDT", result.dst_designation.?);
     try testing.expectEqual(dstoff, result.dst_offset);
     // transition std 2023-03-12T01:59:59-08:00 --> dst 2023-03-12T03:00:00-07:00
-    try testing.expectEqual(stdoff, result.offset(1678615199).offset);
-    try testing.expectEqual(dstoff, result.offset(1678615200).offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1678615199).?.offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1678615200).?.offset);
     // transition dst 2023-11-05T01:59:59-07:00 --> std 2023-11-05T01:00:00-08:00
-    try testing.expectEqual(dstoff, result.offset(1699174799).offset);
-    try testing.expectEqual(stdoff, result.offset(1699174800).offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1699174799).?.offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1699174800).?.offset);
 
     // IANA identifier: America/Sitka
     result = try parse("AKST9AKDT,M3.2.0,M11.1.0");
@@ -664,11 +669,11 @@ test "posix TZ string, regular year" {
     try testing.expectEqualSlices(u8, "AKDT", result.dst_designation.?);
     try testing.expectEqual(dstoff, result.dst_offset);
     // transition std 2023-03-12T01:59:59-09:00 --> dst 2023-03-12T03:00:00-08:00
-    try testing.expectEqual(stdoff, result.offset(1678618799).offset);
-    try testing.expectEqual(dstoff, result.offset(1678618800).offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1678618799).?.offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1678618800).?.offset);
     // transition dst 2023-11-05T01:59:59-08:00 --> std 2023-11-05T01:00:00-09:00
-    try testing.expectEqual(dstoff, result.offset(1699178399).offset);
-    try testing.expectEqual(stdoff, result.offset(1699178400).offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1699178399).?.offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1699178400).?.offset);
 
     // IANA identifier: Asia/Jerusalem
     result = try parse("IST-2IDT,M3.4.4/26,M10.5.0");
@@ -679,11 +684,11 @@ test "posix TZ string, regular year" {
     try testing.expectEqualSlices(u8, "IDT", result.dst_designation.?);
     try testing.expectEqual(dstoff, result.dst_offset);
     // transition std 2023-03-24T01:59:59+02:00 --> dst 2023-03-24T03:00:00+03:00
-    try testing.expectEqual(stdoff, result.offset(1679615999).offset);
-    try testing.expectEqual(dstoff, result.offset(1679616000).offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1679615999).?.offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1679616000).?.offset);
     // transition dst 2023-10-29T01:59:59+03:00 --> std 2023-10-29T01:00:00+02:00
-    try testing.expectEqual(dstoff, result.offset(1698533999).offset);
-    try testing.expectEqual(stdoff, result.offset(1698534000).offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1698533999).?.offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1698534000).?.offset);
 
     // IANA identifier: America/Argentina/Buenos_Aires
     result = try parse("WART4WARST,J1/0,J365/25"); // TODO : separate tests for jday ?
@@ -692,11 +697,11 @@ test "posix TZ string, regular year" {
     try testing.expectEqualSlices(u8, "WART", result.std_designation);
     try testing.expectEqualSlices(u8, "WARST", result.dst_designation.?);
     // transition std 2023-03-24T01:59:59-03:00 --> dst 2023-03-24T03:00:00-03:00
-    try testing.expectEqual(stdoff, result.offset(1679633999).offset);
-    try testing.expectEqual(dstoff, result.offset(1679637600).offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1679633999).?.offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1679637600).?.offset);
     // transition dst 2023-10-29T01:59:59-03:00 --> std 2023-10-29T01:00:00-03:00
-    try testing.expectEqual(dstoff, result.offset(1698555599).offset);
-    try testing.expectEqual(stdoff, result.offset(1698552000).offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1698555599).?.offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1698552000).?.offset);
 
     // IANA identifier: America/Nuuk
     result = try parse("WGT3WGST,M3.5.0/-2,M10.5.0/-1");
@@ -707,11 +712,11 @@ test "posix TZ string, regular year" {
     try testing.expectEqualSlices(u8, "WGST", result.dst_designation.?);
     try testing.expectEqual(dstoff, result.dst_offset);
     // transition std 2021-03-27T21:59:59-03:00 --> dst 2021-03-27T23:00:00-02:00
-    try testing.expectEqual(stdoff, result.offset(1616893199).offset);
-    try testing.expectEqual(dstoff, result.offset(1616893200).offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1616893199).?.offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1616893200).?.offset);
     // transition dst 2021-10-30T22:59:59-02:00 --> std 2021-10-30T22:00:00-03:00
-    try testing.expectEqual(dstoff, result.offset(1635641999).offset);
-    try testing.expectEqual(stdoff, result.offset(1635642000).offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1635641999).?.offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1635642000).?.offset);
 }
 
 test "posix TZ string, leap year, America/New_York, start transition time specified" {
@@ -724,11 +729,11 @@ test "posix TZ string, leap year, America/New_York, start transition time specif
     try testing.expectEqualSlices(u8, "EDT", result.dst_designation.?);
     try testing.expectEqual(dstoff, result.dst_offset);
     // transition std 2020-03-08T01:59:59-05:00 --> dst 2020-03-08T03:00:00-04:00
-    try testing.expectEqual(stdoff, result.offset(1583650799).offset);
-    try testing.expectEqual(dstoff, result.offset(1583650800).offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1583650799).?.offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1583650800).?.offset);
     // transition dst 2020-11-01T01:59:59-04:00 --> std 2020-11-01T01:00:00-05:00
-    try testing.expectEqual(dstoff, result.offset(1604210399).offset);
-    try testing.expectEqual(stdoff, result.offset(1604210400).offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1604210399).?.offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1604210400).?.offset);
 }
 
 test "posix TZ string, leap year, America/New_York, both transition times specified" {
@@ -741,11 +746,11 @@ test "posix TZ string, leap year, America/New_York, both transition times specif
     try testing.expectEqualSlices(u8, "EDT", result.dst_designation.?);
     try testing.expectEqual(dstoff, result.dst_offset);
     // transition std 2020-03-08T01:59:59-05:00 --> dst 2020-03-08T03:00:00-04:00
-    try testing.expectEqual(stdoff, result.offset(1583650799).offset);
-    try testing.expectEqual(dstoff, result.offset(1583650800).offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1583650799).?.offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1583650800).?.offset);
     // transtion dst 2020-11-01T01:59:59-04:00 --> std 2020-11-01T01:00:00-05:00
-    try testing.expectEqual(dstoff, result.offset(1604210399).offset);
-    try testing.expectEqual(stdoff, result.offset(1604210400).offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1604210399).?.offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1604210400).?.offset);
 }
 
 test "posix TZ string, leap year, America/New_York, end transition time specified" {
@@ -758,11 +763,11 @@ test "posix TZ string, leap year, America/New_York, end transition time specifie
     try testing.expectEqualSlices(u8, "EDT", result.dst_designation.?);
     try testing.expectEqual(dstoff, result.dst_offset);
     // transition std 2020-03-08T01:59:59-05:00 --> dst 2020-03-08T03:00:00-04:00
-    try testing.expectEqual(stdoff, result.offset(1583650799).offset);
-    try testing.expectEqual(dstoff, result.offset(1583650800).offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1583650799).?.offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1583650800).?.offset);
     // transtion dst 2020-11-01T01:59:59-04:00 --> std 2020-11-01T01:00:00-05:00
-    try testing.expectEqual(dstoff, result.offset(1604210399).offset);
-    try testing.expectEqual(stdoff, result.offset(1604210400).offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1604210399).?.offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1604210400).?.offset);
 }
 
 test "posix TZ string, leap year, America/Chicago, both transition times specified" {
@@ -775,11 +780,11 @@ test "posix TZ string, leap year, America/Chicago, both transition times specifi
     try testing.expectEqualSlices(u8, "CDT", result.dst_designation.?);
     try testing.expectEqual(dstoff, result.dst_offset);
     // transition std 2020-03-08T01:59:59-06:00 --> dst 2020-03-08T03:00:00-05:00
-    try testing.expectEqual(stdoff, result.offset(1583654399).offset);
-    try testing.expectEqual(dstoff, result.offset(1583654400).offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1583654399).?.offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1583654400).?.offset);
     // transtion dst 2020-11-01T01:59:59-05:00 --> std 2020-11-01T01:00:00-06:00
-    try testing.expectEqual(dstoff, result.offset(1604213999).offset);
-    try testing.expectEqual(stdoff, result.offset(1604214000).offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1604213999).?.offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1604214000).?.offset);
 }
 
 test "posix TZ string, leap year, America/Denver, both transition times specified" {
@@ -792,11 +797,11 @@ test "posix TZ string, leap year, America/Denver, both transition times specifie
     try testing.expectEqualSlices(u8, "MDT", result.dst_designation.?);
     try testing.expectEqual(dstoff, result.dst_offset);
     // transition std 2020-03-08T01:59:59-07:00 --> dst 2020-03-08T03:00:00-06:00
-    try testing.expectEqual(stdoff, result.offset(1583657999).offset);
-    try testing.expectEqual(dstoff, result.offset(1583658000).offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1583657999).?.offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1583658000).?.offset);
     // transtion dst 2020-11-01T01:59:59-06:00 --> std 2020-11-01T01:00:00-07:00
-    try testing.expectEqual(dstoff, result.offset(1604217599).offset);
-    try testing.expectEqual(stdoff, result.offset(1604217600).offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1604217599).?.offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1604217600).?.offset);
 }
 
 test "posix TZ string, leap year, America/Los_Angeles, both transition times specified" {
@@ -809,11 +814,11 @@ test "posix TZ string, leap year, America/Los_Angeles, both transition times spe
     try testing.expectEqualSlices(u8, "PDT", result.dst_designation.?);
     try testing.expectEqual(dstoff, result.dst_offset);
     // transition std 2020-03-08T01:59:59-08:00 --> dst 2020-03-08T03:00:00-07:00
-    try testing.expectEqual(stdoff, result.offset(1583661599).offset);
-    try testing.expectEqual(dstoff, result.offset(1583661600).offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1583661599).?.offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1583661600).?.offset);
     // transtion dst 2020-11-01T01:59:59-07:00 --> std 2020-11-01T01:00:00-08:00
-    try testing.expectEqual(dstoff, result.offset(1604221199).offset);
-    try testing.expectEqual(stdoff, result.offset(1604221200).offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1604221199).?.offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1604221200).?.offset);
 }
 
 test "posix TZ string, leap year, America/Sitka" {
@@ -826,11 +831,11 @@ test "posix TZ string, leap year, America/Sitka" {
     try testing.expectEqualSlices(u8, "AKDT", result.dst_designation.?);
     try testing.expectEqual(dstoff, result.dst_offset);
     // transition std 2020-03-08T01:59:59-09:00 --> dst 2020-03-08T03:00:00-08:00
-    try testing.expectEqual(stdoff, result.offset(1583665199).offset);
-    try testing.expectEqual(dstoff, result.offset(1583665200).offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1583665199).?.offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1583665200).?.offset);
     // transtion dst 2020-11-01T01:59:59-08:00 --> std 2020-11-01T01:00:00-09:00
-    try testing.expectEqual(dstoff, result.offset(1604224799).offset);
-    try testing.expectEqual(stdoff, result.offset(1604224800).offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1604224799).?.offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1604224800).?.offset);
 }
 
 test "posix TZ string, leap year, Asia/Jerusalem" {
@@ -843,11 +848,11 @@ test "posix TZ string, leap year, Asia/Jerusalem" {
     try testing.expectEqualSlices(u8, "IDT", result.dst_designation.?);
     try testing.expectEqual(dstoff, result.dst_offset);
     // transition std 2020-03-27T01:59:59+02:00 --> dst 2020-03-27T03:00:00+03:00
-    try testing.expectEqual(stdoff, result.offset(1585267199).offset);
-    try testing.expectEqual(dstoff, result.offset(1585267200).offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1585267199).?.offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1585267200).?.offset);
     // transtion dst 2020-10-25T01:59:59+03:00 --> std 2020-10-25T01:00:00+02:00
-    try testing.expectEqual(dstoff, result.offset(1603580399).offset);
-    try testing.expectEqual(stdoff, result.offset(1603580400).offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1603580399).?.offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1603580400).?.offset);
 }
 
 // Buenos Aires has DST all year long, make sure that it never returns the STD offset
@@ -861,18 +866,18 @@ test "posix TZ string, leap year, America/Argentina/Buenos_Aires" {
     _ = stdoff;
 
     // transition std 2020-03-27T01:59:59-03:00 --> dst 2020-03-27T03:00:00-03:00
-    try testing.expectEqual(dstoff, result.offset(1585285199).offset);
-    try testing.expectEqual(dstoff, result.offset(1585288800).offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1585285199).?.offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1585288800).?.offset);
     // transtion dst 2020-10-25T01:59:59-03:00 --> std 2020-10-25T01:00:00-03:00
-    try testing.expectEqual(dstoff, result.offset(1603601999).offset);
-    try testing.expectEqual(dstoff, result.offset(1603598400).offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1603601999).?.offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1603598400).?.offset);
 
     // Make sure it returns dstoff at the start of the year
-    try testing.expectEqual(dstoff, result.offset(1577836800).offset); // 2020
-    try testing.expectEqual(dstoff, result.offset(1609459200).offset); // 2021
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1577836800).?.offset); // 2020
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1609459200).?.offset); // 2021
 
     // Make sure it returns dstoff at the end of the year
-    try testing.expectEqual(dstoff, result.offset(1609459199).offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1609459199).?.offset);
 }
 
 test "posix TZ string, leap year, America/Nuuk" {
@@ -885,11 +890,11 @@ test "posix TZ string, leap year, America/Nuuk" {
     try testing.expectEqualSlices(u8, "WGST", result.dst_designation.?);
     try testing.expectEqual(dstoff, result.dst_offset);
     // transition std 2020-03-28T21:59:59-03:00 --> dst 2020-03-28T23:00:00-02:00
-    try testing.expectEqual(stdoff, result.offset(1585443599).offset);
-    try testing.expectEqual(dstoff, result.offset(1585443600).offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1585443599).?.offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1585443600).?.offset);
     // transtion dst 2020-10-24T22:59:59-02:00 --> std 2020-10-24T22:00:00-03:00
-    try testing.expectEqual(dstoff, result.offset(1603587599).offset);
-    try testing.expectEqual(stdoff, result.offset(1603587600).offset);
+    try testing.expectEqual(dstoff, result.offsetAtTimestamp(1603587599).?.offset);
+    try testing.expectEqual(stdoff, result.offsetAtTimestamp(1603587600).?.offset);
 }
 
 test "posix TZ, valid strings, Extreme offset hour" {
@@ -1102,121 +1107,121 @@ test "posix TZ EST5EDT,M3.2.0/4:00,M11.1.0/3:00 from zoneinfo_test.py" {
     // Transition to EDT on the 2nd Sunday in March at 4 AM, and
     // transition back on the first Sunday in November at 3AM
     const result = try parse("EST5EDT,M3.2.0/4:00,M11.1.0/3:00");
-    try testing.expectEqual(@as(i32, -18000), result.offset(1552107600).offset); // 2019-03-09T00:00:00-05:00
-    try testing.expectEqual(@as(i32, -18000), result.offset(1552208340).offset); // 2019-03-10T03:59:00-05:00
-    try testing.expectEqual(@as(i32, -14400), result.offset(1572667200).offset); // 2019-11-02T00:00:00-04:00
-    try testing.expectEqual(@as(i32, -14400), result.offset(1572760740).offset); // 2019-11-03T01:59:00-04:00
-    try testing.expectEqual(@as(i32, -14400), result.offset(1572760800).offset); // 2019-11-03T02:00:00-04:00
-    try testing.expectEqual(@as(i32, -18000), result.offset(1572764400).offset); // 2019-11-03T02:00:00-05:00
-    try testing.expectEqual(@as(i32, -18000), result.offset(1583657940).offset); // 2020-03-08T03:59:00-05:00
-    try testing.expectEqual(@as(i32, -14400), result.offset(1604210340).offset); // 2020-11-01T01:59:00-04:00
-    try testing.expectEqual(@as(i32, -14400), result.offset(1604210400).offset); // 2020-11-01T02:00:00-04:00
-    try testing.expectEqual(@as(i32, -18000), result.offset(1604214000).offset); // 2020-11-01T02:00:00-05:00
+    try testing.expectEqual(@as(i32, -18000), result.offsetAtTimestamp(1552107600).?.offset); // 2019-03-09T00:00:00-05:00
+    try testing.expectEqual(@as(i32, -18000), result.offsetAtTimestamp(1552208340).?.offset); // 2019-03-10T03:59:00-05:00
+    try testing.expectEqual(@as(i32, -14400), result.offsetAtTimestamp(1572667200).?.offset); // 2019-11-02T00:00:00-04:00
+    try testing.expectEqual(@as(i32, -14400), result.offsetAtTimestamp(1572760740).?.offset); // 2019-11-03T01:59:00-04:00
+    try testing.expectEqual(@as(i32, -14400), result.offsetAtTimestamp(1572760800).?.offset); // 2019-11-03T02:00:00-04:00
+    try testing.expectEqual(@as(i32, -18000), result.offsetAtTimestamp(1572764400).?.offset); // 2019-11-03T02:00:00-05:00
+    try testing.expectEqual(@as(i32, -18000), result.offsetAtTimestamp(1583657940).?.offset); // 2020-03-08T03:59:00-05:00
+    try testing.expectEqual(@as(i32, -14400), result.offsetAtTimestamp(1604210340).?.offset); // 2020-11-01T01:59:00-04:00
+    try testing.expectEqual(@as(i32, -14400), result.offsetAtTimestamp(1604210400).?.offset); // 2020-11-01T02:00:00-04:00
+    try testing.expectEqual(@as(i32, -18000), result.offsetAtTimestamp(1604214000).?.offset); // 2020-11-01T02:00:00-05:00
 }
 
 test "posix TZ GMT0BST-1,M3.5.0/1:00,M10.5.0/2:00 from zoneinfo_test.py" {
     // Transition to BST happens on the last Sunday in March at 1 AM GMT
     // and the transition back happens the last Sunday in October at 2AM BST
     const result = try parse("GMT0BST-1,M3.5.0/1:00,M10.5.0/2:00");
-    try testing.expectEqual(@as(i32, 0), result.offset(1553904000).offset); // 2019-03-30T00:00:00+00:00
-    try testing.expectEqual(@as(i32, 0), result.offset(1553993940).offset); // 2019-03-31T00:59:00+00:00
-    try testing.expectEqual(@as(i32, 3600), result.offset(1553994000).offset); // 2019-03-31T02:00:00+01:00
-    try testing.expectEqual(@as(i32, 3600), result.offset(1572044400).offset); // 2019-10-26T00:00:00+01:00
-    try testing.expectEqual(@as(i32, 3600), result.offset(1572134340).offset); // 2019-10-27T00:59:00+01:00
-    try testing.expectEqual(@as(i32, 0), result.offset(1585443540).offset); // 2020-03-29T00:59:00+00:00
-    try testing.expectEqual(@as(i32, 3600), result.offset(1585443600).offset); // 2020-03-29T02:00:00+01:00
-    try testing.expectEqual(@as(i32, 3600), result.offset(1603583940).offset); // 2020-10-25T00:59:00+01:00
-    try testing.expectEqual(@as(i32, 3600), result.offset(1603584000).offset); // 2020-10-25T01:00:00+01:00
-    try testing.expectEqual(@as(i32, 0), result.offset(1603591200).offset); // 2020-10-25T02:00:00+00:00
+    try testing.expectEqual(@as(i32, 0), result.offsetAtTimestamp(1553904000).?.offset); // 2019-03-30T00:00:00+00:00
+    try testing.expectEqual(@as(i32, 0), result.offsetAtTimestamp(1553993940).?.offset); // 2019-03-31T00:59:00+00:00
+    try testing.expectEqual(@as(i32, 3600), result.offsetAtTimestamp(1553994000).?.offset); // 2019-03-31T02:00:00+01:00
+    try testing.expectEqual(@as(i32, 3600), result.offsetAtTimestamp(1572044400).?.offset); // 2019-10-26T00:00:00+01:00
+    try testing.expectEqual(@as(i32, 3600), result.offsetAtTimestamp(1572134340).?.offset); // 2019-10-27T00:59:00+01:00
+    try testing.expectEqual(@as(i32, 0), result.offsetAtTimestamp(1585443540).?.offset); // 2020-03-29T00:59:00+00:00
+    try testing.expectEqual(@as(i32, 3600), result.offsetAtTimestamp(1585443600).?.offset); // 2020-03-29T02:00:00+01:00
+    try testing.expectEqual(@as(i32, 3600), result.offsetAtTimestamp(1603583940).?.offset); // 2020-10-25T00:59:00+01:00
+    try testing.expectEqual(@as(i32, 3600), result.offsetAtTimestamp(1603584000).?.offset); // 2020-10-25T01:00:00+01:00
+    try testing.expectEqual(@as(i32, 0), result.offsetAtTimestamp(1603591200).?.offset); // 2020-10-25T02:00:00+00:00
 }
 
 test "posix TZ AEST-10AEDT,M10.1.0/2,M4.1.0/3 from zoneinfo_test.py" {
     // Austrialian time zone - DST start is chronologically first
     const result = try parse("AEST-10AEDT,M10.1.0/2,M4.1.0/3");
-    try testing.expectEqual(@as(i32, 39600), result.offset(1554469200).offset); // 2019-04-06T00:00:00+11:00
-    try testing.expectEqual(@as(i32, 39600), result.offset(1554562740).offset); // 2019-04-07T01:59:00+11:00
-    try testing.expectEqual(@as(i32, 39600), result.offset(1554562740).offset); // 2019-04-07T01:59:00+11:00
-    try testing.expectEqual(@as(i32, 39600), result.offset(1554562800).offset); // 2019-04-07T02:00:00+11:00
-    try testing.expectEqual(@as(i32, 39600), result.offset(1554562860).offset); // 2019-04-07T02:01:00+11:00
-    try testing.expectEqual(@as(i32, 36000), result.offset(1554566400).offset); // 2019-04-07T02:00:00+10:00
-    try testing.expectEqual(@as(i32, 36000), result.offset(1554566460).offset); // 2019-04-07T02:01:00+10:00
-    try testing.expectEqual(@as(i32, 36000), result.offset(1554570000).offset); // 2019-04-07T03:00:00+10:00
-    try testing.expectEqual(@as(i32, 36000), result.offset(1554570000).offset); // 2019-04-07T03:00:00+10:00
-    try testing.expectEqual(@as(i32, 36000), result.offset(1570197600).offset); // 2019-10-05T00:00:00+10:00
-    try testing.expectEqual(@as(i32, 36000), result.offset(1570291140).offset); // 2019-10-06T01:59:00+10:00
-    try testing.expectEqual(@as(i32, 39600), result.offset(1570291200).offset); // 2019-10-06T03:00:00+11:00
+    try testing.expectEqual(@as(i32, 39600), result.offsetAtTimestamp(1554469200).?.offset); // 2019-04-06T00:00:00+11:00
+    try testing.expectEqual(@as(i32, 39600), result.offsetAtTimestamp(1554562740).?.offset); // 2019-04-07T01:59:00+11:00
+    try testing.expectEqual(@as(i32, 39600), result.offsetAtTimestamp(1554562740).?.offset); // 2019-04-07T01:59:00+11:00
+    try testing.expectEqual(@as(i32, 39600), result.offsetAtTimestamp(1554562800).?.offset); // 2019-04-07T02:00:00+11:00
+    try testing.expectEqual(@as(i32, 39600), result.offsetAtTimestamp(1554562860).?.offset); // 2019-04-07T02:01:00+11:00
+    try testing.expectEqual(@as(i32, 36000), result.offsetAtTimestamp(1554566400).?.offset); // 2019-04-07T02:00:00+10:00
+    try testing.expectEqual(@as(i32, 36000), result.offsetAtTimestamp(1554566460).?.offset); // 2019-04-07T02:01:00+10:00
+    try testing.expectEqual(@as(i32, 36000), result.offsetAtTimestamp(1554570000).?.offset); // 2019-04-07T03:00:00+10:00
+    try testing.expectEqual(@as(i32, 36000), result.offsetAtTimestamp(1554570000).?.offset); // 2019-04-07T03:00:00+10:00
+    try testing.expectEqual(@as(i32, 36000), result.offsetAtTimestamp(1570197600).?.offset); // 2019-10-05T00:00:00+10:00
+    try testing.expectEqual(@as(i32, 36000), result.offsetAtTimestamp(1570291140).?.offset); // 2019-10-06T01:59:00+10:00
+    try testing.expectEqual(@as(i32, 39600), result.offsetAtTimestamp(1570291200).?.offset); // 2019-10-06T03:00:00+11:00
 }
 
 test "posix TZ IST-1GMT0,M10.5.0,M3.5.0/1 from zoneinfo_test.py" {
     // Irish time zone - negative DST
     const result = try parse("IST-1GMT0,M10.5.0,M3.5.0/1");
-    try testing.expectEqual(@as(i32, 0), result.offset(1553904000).offset); // 2019-03-30T00:00:00+00:00
-    try testing.expectEqual(@as(i32, 0), result.offset(1553993940).offset); // 2019-03-31T00:59:00+00:00
-    try testing.expectEqual(true, result.offset(1553993940).is_daylight_saving_time); // 2019-03-31T00:59:00+00:00
-    try testing.expectEqual(@as(i32, 3600), result.offset(1553994000).offset); // 2019-03-31T02:00:00+01:00
-    try testing.expectEqual(false, result.offset(1553994000).is_daylight_saving_time); // 2019-03-31T02:00:00+01:00
-    try testing.expectEqual(@as(i32, 3600), result.offset(1572044400).offset); // 2019-10-26T00:00:00+01:00
-    try testing.expectEqual(@as(i32, 3600), result.offset(1572134340).offset); // 2019-10-27T00:59:00+01:00
-    try testing.expectEqual(@as(i32, 3600), result.offset(1572134400).offset); // 2019-10-27T01:00:00+01:00
-    try testing.expectEqual(@as(i32, 0), result.offset(1572138000).offset); // 2019-10-27T01:00:00+00:00
-    try testing.expectEqual(@as(i32, 0), result.offset(1572141600).offset); // 2019-10-27T02:00:00+00:00
-    try testing.expectEqual(@as(i32, 0), result.offset(1585443540).offset); // 2020-03-29T00:59:00+00:00
-    try testing.expectEqual(@as(i32, 3600), result.offset(1585443600).offset); // 2020-03-29T02:00:00+01:00
-    try testing.expectEqual(@as(i32, 3600), result.offset(1603583940).offset); // 2020-10-25T00:59:00+01:00
-    try testing.expectEqual(@as(i32, 3600), result.offset(1603584000).offset); // 2020-10-25T01:00:00+01:00
-    try testing.expectEqual(@as(i32, 0), result.offset(1603591200).offset); // 2020-10-25T02:00:00+00:00
+    try testing.expectEqual(@as(i32, 0), result.offsetAtTimestamp(1553904000).?.offset); // 2019-03-30T00:00:00+00:00
+    try testing.expectEqual(@as(i32, 0), result.offsetAtTimestamp(1553993940).?.offset); // 2019-03-31T00:59:00+00:00
+    try testing.expectEqual(true, result.offsetAtTimestamp(1553993940).?.is_daylight_saving_time); // 2019-03-31T00:59:00+00:00
+    try testing.expectEqual(@as(i32, 3600), result.offsetAtTimestamp(1553994000).?.offset); // 2019-03-31T02:00:00+01:00
+    try testing.expectEqual(false, result.offsetAtTimestamp(1553994000).?.is_daylight_saving_time); // 2019-03-31T02:00:00+01:00
+    try testing.expectEqual(@as(i32, 3600), result.offsetAtTimestamp(1572044400).?.offset); // 2019-10-26T00:00:00+01:00
+    try testing.expectEqual(@as(i32, 3600), result.offsetAtTimestamp(1572134340).?.offset); // 2019-10-27T00:59:00+01:00
+    try testing.expectEqual(@as(i32, 3600), result.offsetAtTimestamp(1572134400).?.offset); // 2019-10-27T01:00:00+01:00
+    try testing.expectEqual(@as(i32, 0), result.offsetAtTimestamp(1572138000).?.offset); // 2019-10-27T01:00:00+00:00
+    try testing.expectEqual(@as(i32, 0), result.offsetAtTimestamp(1572141600).?.offset); // 2019-10-27T02:00:00+00:00
+    try testing.expectEqual(@as(i32, 0), result.offsetAtTimestamp(1585443540).?.offset); // 2020-03-29T00:59:00+00:00
+    try testing.expectEqual(@as(i32, 3600), result.offsetAtTimestamp(1585443600).?.offset); // 2020-03-29T02:00:00+01:00
+    try testing.expectEqual(@as(i32, 3600), result.offsetAtTimestamp(1603583940).?.offset); // 2020-10-25T00:59:00+01:00
+    try testing.expectEqual(@as(i32, 3600), result.offsetAtTimestamp(1603584000).?.offset); // 2020-10-25T01:00:00+01:00
+    try testing.expectEqual(@as(i32, 0), result.offsetAtTimestamp(1603591200).?.offset); // 2020-10-25T02:00:00+00:00
 }
 
 test "posix TZ <+11>-11 from zoneinfo_test.py" {
     // Pacific/Kosrae: Fixed offset zone with a quoted numerical tzname
     const result = try parse("<+11>-11");
-    try testing.expectEqual(@as(i32, 39600), result.offset(1577797200).offset); // 2020-01-01T00:00:00+11:00
+    try testing.expectEqual(@as(i32, 39600), result.offsetAtTimestamp(1577797200).?.offset); // 2020-01-01T00:00:00+11:00
 }
 
 test "posix TZ <-04>4<-03>,M9.1.6/24,M4.1.6/24 from zoneinfo_test.py" {
     // Quoted STD and DST, transitions at 24:00
     const result = try parse("<-04>4<-03>,M9.1.6/24,M4.1.6/24");
-    try testing.expectEqual(@as(i32, -14400), result.offset(1588305600).offset); // 2020-05-01T00:00:00-04:00
-    try testing.expectEqual(@as(i32, -10800), result.offset(1604199600).offset); // 2020-11-01T00:00:00-03:00
+    try testing.expectEqual(@as(i32, -14400), result.offsetAtTimestamp(1588305600).?.offset); // 2020-05-01T00:00:00-04:00
+    try testing.expectEqual(@as(i32, -10800), result.offsetAtTimestamp(1604199600).?.offset); // 2020-11-01T00:00:00-03:00
 }
 
 test "posix TZ EST5EDT,0/0,J365/25 from zoneinfo_test.py" {
     // Permanent daylight saving time is modeled with transitions at 0/0
     // and J365/25, as mentioned in RFC 8536 Section 3.3.1
     const result = try parse("EST5EDT,0/0,J365/25");
-    try testing.expectEqual(@as(i32, -14400), result.offset(1546315200).offset); // 2019-01-01T00:00:00-04:00
-    try testing.expectEqual(@as(i32, -14400), result.offset(1559361600).offset); // 2019-06-01T00:00:00-04:00
-    try testing.expectEqual(@as(i32, -14400), result.offset(1577851199).offset); // 2019-12-31T23:59:59.999999-04:00
-    try testing.expectEqual(@as(i32, -14400), result.offset(1577851200).offset); // 2020-01-01T00:00:00-04:00
-    try testing.expectEqual(@as(i32, -14400), result.offset(1583035200).offset); // 2020-03-01T00:00:00-04:00
-    try testing.expectEqual(@as(i32, -14400), result.offset(1590984000).offset); // 2020-06-01T00:00:00-04:00
-    try testing.expectEqual(@as(i32, -14400), result.offset(1609473599).offset); // 2020-12-31T23:59:59.999999-04:00
-    try testing.expectEqual(@as(i32, -14400), result.offset(13569480000).offset); // 2400-01-01T00:00:00-04:00
-    try testing.expectEqual(@as(i32, -14400), result.offset(13574664000).offset); // 2400-03-01T00:00:00-04:00
-    try testing.expectEqual(@as(i32, -14400), result.offset(13601102399).offset); // 2400-12-31T23:59:59.999999-04:00
+    try testing.expectEqual(@as(i32, -14400), result.offsetAtTimestamp(1546315200).?.offset); // 2019-01-01T00:00:00-04:00
+    try testing.expectEqual(@as(i32, -14400), result.offsetAtTimestamp(1559361600).?.offset); // 2019-06-01T00:00:00-04:00
+    try testing.expectEqual(@as(i32, -14400), result.offsetAtTimestamp(1577851199).?.offset); // 2019-12-31T23:59:59.999999-04:00
+    try testing.expectEqual(@as(i32, -14400), result.offsetAtTimestamp(1577851200).?.offset); // 2020-01-01T00:00:00-04:00
+    try testing.expectEqual(@as(i32, -14400), result.offsetAtTimestamp(1583035200).?.offset); // 2020-03-01T00:00:00-04:00
+    try testing.expectEqual(@as(i32, -14400), result.offsetAtTimestamp(1590984000).?.offset); // 2020-06-01T00:00:00-04:00
+    try testing.expectEqual(@as(i32, -14400), result.offsetAtTimestamp(1609473599).?.offset); // 2020-12-31T23:59:59.999999-04:00
+    try testing.expectEqual(@as(i32, -14400), result.offsetAtTimestamp(13569480000).?.offset); // 2400-01-01T00:00:00-04:00
+    try testing.expectEqual(@as(i32, -14400), result.offsetAtTimestamp(13574664000).?.offset); // 2400-03-01T00:00:00-04:00
+    try testing.expectEqual(@as(i32, -14400), result.offsetAtTimestamp(13601102399).?.offset); // 2400-12-31T23:59:59.999999-04:00
 }
 
 test "posix TZ AAA3BBB,J60/12,J305/12 from zoneinfo_test.py" {
     // Transitions on March 1st and November 1st of each year
     const result = try parse("AAA3BBB,J60/12,J305/12");
-    try testing.expectEqual(@as(i32, -10800), result.offset(1546311600).offset); // 2019-01-01T00:00:00-03:00
-    try testing.expectEqual(@as(i32, -10800), result.offset(1551322800).offset); // 2019-02-28T00:00:00-03:00
-    try testing.expectEqual(@as(i32, -10800), result.offset(1551452340).offset); // 2019-03-01T11:59:00-03:00
-    try testing.expectEqual(@as(i32, -7200), result.offset(1551452400).offset); // 2019-03-01T13:00:00-02:00
-    try testing.expectEqual(@as(i32, -7200), result.offset(1572613140).offset); // 2019-11-01T10:59:00-02:00
-    try testing.expectEqual(@as(i32, -7200), result.offset(1572613200).offset); // 2019-11-01T11:00:00-02:00
-    try testing.expectEqual(@as(i32, -10800), result.offset(1572616800).offset); // 2019-11-01T11:00:00-03:00
-    try testing.expectEqual(@as(i32, -10800), result.offset(1572620400).offset); // 2019-11-01T12:00:00-03:00
-    try testing.expectEqual(@as(i32, -10800), result.offset(1577847599).offset); // 2019-12-31T23:59:59.999999-03:00
-    try testing.expectEqual(@as(i32, -10800), result.offset(1577847600).offset); // 2020-01-01T00:00:00-03:00
-    try testing.expectEqual(@as(i32, -10800), result.offset(1582945200).offset); // 2020-02-29T00:00:00-03:00
-    try testing.expectEqual(@as(i32, -10800), result.offset(1583074740).offset); // 2020-03-01T11:59:00-03:00
-    try testing.expectEqual(@as(i32, -7200), result.offset(1583074800).offset); // 2020-03-01T13:00:00-02:00
-    try testing.expectEqual(@as(i32, -7200), result.offset(1604235540).offset); // 2020-11-01T10:59:00-02:00
-    try testing.expectEqual(@as(i32, -7200), result.offset(1604235600).offset); // 2020-11-01T11:00:00-02:00
-    try testing.expectEqual(@as(i32, -10800), result.offset(1604239200).offset); // 2020-11-01T11:00:00-03:00
-    try testing.expectEqual(@as(i32, -10800), result.offset(1604242800).offset); // 2020-11-01T12:00:00-03:00
-    try testing.expectEqual(@as(i32, -10800), result.offset(1609469999).offset); // 2020-12-31T23:59:59.999999-03:00
+    try testing.expectEqual(@as(i32, -10800), result.offsetAtTimestamp(1546311600).?.offset); // 2019-01-01T00:00:00-03:00
+    try testing.expectEqual(@as(i32, -10800), result.offsetAtTimestamp(1551322800).?.offset); // 2019-02-28T00:00:00-03:00
+    try testing.expectEqual(@as(i32, -10800), result.offsetAtTimestamp(1551452340).?.offset); // 2019-03-01T11:59:00-03:00
+    try testing.expectEqual(@as(i32, -7200), result.offsetAtTimestamp(1551452400).?.offset); // 2019-03-01T13:00:00-02:00
+    try testing.expectEqual(@as(i32, -7200), result.offsetAtTimestamp(1572613140).?.offset); // 2019-11-01T10:59:00-02:00
+    try testing.expectEqual(@as(i32, -7200), result.offsetAtTimestamp(1572613200).?.offset); // 2019-11-01T11:00:00-02:00
+    try testing.expectEqual(@as(i32, -10800), result.offsetAtTimestamp(1572616800).?.offset); // 2019-11-01T11:00:00-03:00
+    try testing.expectEqual(@as(i32, -10800), result.offsetAtTimestamp(1572620400).?.offset); // 2019-11-01T12:00:00-03:00
+    try testing.expectEqual(@as(i32, -10800), result.offsetAtTimestamp(1577847599).?.offset); // 2019-12-31T23:59:59.999999-03:00
+    try testing.expectEqual(@as(i32, -10800), result.offsetAtTimestamp(1577847600).?.offset); // 2020-01-01T00:00:00-03:00
+    try testing.expectEqual(@as(i32, -10800), result.offsetAtTimestamp(1582945200).?.offset); // 2020-02-29T00:00:00-03:00
+    try testing.expectEqual(@as(i32, -10800), result.offsetAtTimestamp(1583074740).?.offset); // 2020-03-01T11:59:00-03:00
+    try testing.expectEqual(@as(i32, -7200), result.offsetAtTimestamp(1583074800).?.offset); // 2020-03-01T13:00:00-02:00
+    try testing.expectEqual(@as(i32, -7200), result.offsetAtTimestamp(1604235540).?.offset); // 2020-11-01T10:59:00-02:00
+    try testing.expectEqual(@as(i32, -7200), result.offsetAtTimestamp(1604235600).?.offset); // 2020-11-01T11:00:00-02:00
+    try testing.expectEqual(@as(i32, -10800), result.offsetAtTimestamp(1604239200).?.offset); // 2020-11-01T11:00:00-03:00
+    try testing.expectEqual(@as(i32, -10800), result.offsetAtTimestamp(1604242800).?.offset); // 2020-11-01T12:00:00-03:00
+    try testing.expectEqual(@as(i32, -10800), result.offsetAtTimestamp(1609469999).?.offset); // 2020-12-31T23:59:59.999999-03:00
 }
 
 test "posix TZ <-03>3<-02>,M3.5.0/-2,M10.5.0/-1 from zoneinfo_test.py" {
@@ -1224,24 +1229,24 @@ test "posix TZ <-03>3<-02>,M3.5.0/-2,M10.5.0/-1 from zoneinfo_test.py" {
     // Saturday before the last Sunday of March and October, at 22:00 and 23:00,
     // respectively. This is encoded with negative start and end transition times.
     const result = try parse("<-03>3<-02>,M3.5.0/-2,M10.5.0/-1");
-    try testing.expectEqual(@as(i32, -10800), result.offset(1585278000).offset); // 2020-03-27T00:00:00-03:00
-    try testing.expectEqual(@as(i32, -10800), result.offset(1585443599).offset); // 2020-03-28T21:59:59-03:00
-    try testing.expectEqual(@as(i32, -7200), result.offset(1585443600).offset); // 2020-03-28T23:00:00-02:00
-    try testing.expectEqual(@as(i32, -7200), result.offset(1603580400).offset); // 2020-10-24T21:00:00-02:00
-    try testing.expectEqual(@as(i32, -7200), result.offset(1603584000).offset); // 2020-10-24T22:00:00-02:00
-    try testing.expectEqual(@as(i32, -10800), result.offset(1603587600).offset); // 2020-10-24T22:00:00-03:00
-    try testing.expectEqual(@as(i32, -10800), result.offset(1603591200).offset); // 2020-10-24T23:00:00-03:00
+    try testing.expectEqual(@as(i32, -10800), result.offsetAtTimestamp(1585278000).?.offset); // 2020-03-27T00:00:00-03:00
+    try testing.expectEqual(@as(i32, -10800), result.offsetAtTimestamp(1585443599).?.offset); // 2020-03-28T21:59:59-03:00
+    try testing.expectEqual(@as(i32, -7200), result.offsetAtTimestamp(1585443600).?.offset); // 2020-03-28T23:00:00-02:00
+    try testing.expectEqual(@as(i32, -7200), result.offsetAtTimestamp(1603580400).?.offset); // 2020-10-24T21:00:00-02:00
+    try testing.expectEqual(@as(i32, -7200), result.offsetAtTimestamp(1603584000).?.offset); // 2020-10-24T22:00:00-02:00
+    try testing.expectEqual(@as(i32, -10800), result.offsetAtTimestamp(1603587600).?.offset); // 2020-10-24T22:00:00-03:00
+    try testing.expectEqual(@as(i32, -10800), result.offsetAtTimestamp(1603591200).?.offset); // 2020-10-24T23:00:00-03:00
 }
 
 test "posix TZ AAA3BBB,M3.2.0/01:30,M11.1.0/02:15:45 from zoneinfo_test.py" {
     // Transition times with minutes and seconds
     const result = try parse("AAA3BBB,M3.2.0/01:30,M11.1.0/02:15:45");
-    try testing.expectEqual(@as(i32, -10800), result.offset(1331438400).offset); // 2012-03-11T01:00:00-03:00
-    try testing.expectEqual(@as(i32, -7200), result.offset(1331440200).offset); // 2012-03-11T02:30:00-02:00
-    try testing.expectEqual(@as(i32, -7200), result.offset(1351998944).offset); // 2012-11-04T01:15:44.999999-02:00
-    try testing.expectEqual(@as(i32, -7200), result.offset(1351998945).offset); // 2012-11-04T01:15:45-02:00
-    try testing.expectEqual(@as(i32, -10800), result.offset(1352002545).offset); // 2012-11-04T01:15:45-03:00
-    try testing.expectEqual(@as(i32, -10800), result.offset(1352006145).offset); // 2012-11-04T02:15:45-03:00
+    try testing.expectEqual(@as(i32, -10800), result.offsetAtTimestamp(1331438400).?.offset); // 2012-03-11T01:00:00-03:00
+    try testing.expectEqual(@as(i32, -7200), result.offsetAtTimestamp(1331440200).?.offset); // 2012-03-11T02:30:00-02:00
+    try testing.expectEqual(@as(i32, -7200), result.offsetAtTimestamp(1351998944).?.offset); // 2012-11-04T01:15:44.999999-02:00
+    try testing.expectEqual(@as(i32, -7200), result.offsetAtTimestamp(1351998945).?.offset); // 2012-11-04T01:15:45-02:00
+    try testing.expectEqual(@as(i32, -10800), result.offsetAtTimestamp(1352002545).?.offset); // 2012-11-04T01:15:45-03:00
+    try testing.expectEqual(@as(i32, -10800), result.offsetAtTimestamp(1352006145).?.offset); // 2012-11-04T02:15:45-03:00
 }
 
 const chrono = @import("../lib.zig");
