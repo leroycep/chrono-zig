@@ -54,15 +54,15 @@ pub const DataBase = struct {
     }
 
     /// Gets a TimeZone by it's IANA identifier
-    pub fn getTimeZone(this: *@This(), identifier: []const u8) !TimeZone {
-        if (this.tzif_cache.get(identifier)) |tzif| {
+    pub fn getTimeZone(this: *@This(), identifier: Identifier) !TimeZone {
+        if (this.tzif_cache.get(identifier.string)) |tzif| {
             return tzif.timeZone();
         }
 
         if (this.tzif_dir) |tzif_dir| parse_tzif_file: {
-            const tzif_file = tzif_dir.openFile(identifier, .{}) catch |err| switch (err) {
+            const tzif_file = tzif_dir.openFile(identifier.string, .{}) catch |err| switch (err) {
                 error.FileNotFound => {
-                    log.debug("IANA identifier not found in zoneinfo dir: \"{}\"", .{std.zig.fmtEscapes(identifier)});
+                    log.debug("IANA identifier not found in zoneinfo dir: \"{}\"", .{std.zig.fmtEscapes(identifier.string)});
                     break :parse_tzif_file;
                 },
                 else => return err,
@@ -72,7 +72,7 @@ pub const DataBase = struct {
             const tzif = try this.gpa.create(TZif);
             tzif.* = try TZif.parse(this.gpa, tzif_file.reader(), tzif_file.seekableStream());
 
-            const identifier_owned = try this.gpa.dupe(u8, identifier);
+            const identifier_owned = try this.gpa.dupe(u8, identifier.string);
             try this.tzif_cache.putNoClobber(this.gpa, identifier_owned, tzif);
 
             return tzif.timeZone();
@@ -122,22 +122,50 @@ pub const DataBase = struct {
                 return error.InvalidEtcLocalTimeSymlink;
             }
 
-            var identifier = std.ArrayList(u8).init(this.gpa);
-            defer identifier.deinit();
+            var identifier_string = std.ArrayList(u8).init(this.gpa);
+            defer identifier_string.deinit();
 
             while (component_iter.next()) |component| {
-                if (identifier.items.len > 0) try identifier.append('/');
-                try identifier.appendSlice(component.name);
+                if (identifier_string.items.len > 0) try identifier_string.append('/');
+                try identifier_string.appendSlice(component.name);
             }
 
-            const timezone = try this.getTimeZone(identifier.items);
+            const identifier = try Identifier.parse(identifier_string.items);
+            const timezone = try this.getTimeZone(identifier);
 
-            this.localtime_identifier = try identifier.toOwnedSlice();
+            this.localtime_identifier = try identifier_string.toOwnedSlice();
 
             return timezone;
         }
 
         return error.NotFound;
+    }
+};
+
+/// IANA timezone strings must be parsed into an Identifier first, to ensure that user input won't read from a different
+/// directory zoneinfo.
+pub const Identifier = struct {
+    string: []const u8,
+
+    /// This function will validate that the IANA identifier only contains valid characters and doesn't, for example,
+    /// contain stuff like "../".
+    pub fn parse(string: []const u8) !@This() {
+        for (string) |character| {
+            switch (character) {
+                'A'...'Z',
+                'a'...'z',
+                '0'...'9',
+                '+',
+                '-',
+                '_',
+                '/',
+                => {},
+                else => return error.InvalidFormat,
+            }
+        }
+        return @This(){
+            .string = string,
+        };
     }
 };
 
