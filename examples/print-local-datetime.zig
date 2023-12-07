@@ -9,7 +9,7 @@ pub fn main() !void {
     var tzdb = try chrono.tz.DataBase.init(gpa);
     defer tzdb.deinit();
 
-    const timezone = try tzdb.getLocalTimeZone(gpa);
+    const timezone = try tzdb.getLocalTimeZone();
 
     const timestamp_utc = std.time.timestamp();
     const local_offset = timezone.offsetAtTimestamp(timestamp_utc) orelse {

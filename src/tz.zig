@@ -82,13 +82,13 @@ pub const DataBase = struct {
     }
 
     /// Returns the local timezone if it can find it, or null otherwise. Returns an error on OutOfMemory.
-    pub fn getLocalTimeZone(this: *@This(), gpa: std.mem.Allocator) !TimeZone {
+    pub fn getLocalTimeZone(this: *@This()) !TimeZone {
         // TODO: Check if we are on a platform that uses TZ or `/etc/localtime` to specify the timezone
         const platform_supports_tz_env = true;
         const platform_supports_etc_localtime = true;
 
         if (platform_supports_tz_env) parse_tz_env_var: {
-            const tz_env_var = this.tz_env_var orelse if (std.process.getEnvVarOwned(gpa, "TZ")) |tz_env| store_tz_env_var: {
+            const tz_env_var = this.tz_env_var orelse if (std.process.getEnvVarOwned(this.gpa, "TZ")) |tz_env| store_tz_env_var: {
                 this.tz_env_var = tz_env;
                 break :store_tz_env_var tz_env;
             } else |err| switch (err) {
@@ -98,7 +98,7 @@ pub const DataBase = struct {
             };
 
             // TODO: Check for TZ strings starting with `:`
-            const posix = try gpa.create(Posix);
+            const posix = try this.gpa.create(Posix);
             posix.* = try Posix.parse(tz_env_var);
             return posix.timeZone();
         }
