@@ -10,7 +10,7 @@ pub fn build(b: *Builder) void {
         .source_file = .{ .path = "src/lib.zig" },
     });
 
-    const check_step = b.step("check", "Run tests and build examples");
+    const check_step = b.step("run-tests-and-build-examples", "Runs tests and builds examples; run this to make sure everything works");
 
     const test_exe = b.addTest(.{
         .root_source_file = .{ .path = "src/lib.zig" },
