@@ -208,35 +208,53 @@ pub const TimeZone = struct {
     ptr: *const anyopaque,
     vtable: *const VTable,
 
-    pub const Offset = struct {
-        offset: i32,
-        is_daylight_saving_time: bool,
-        designation: []const u8,
-    };
-
     pub const VTable = struct {
-        offsetAtTimestamp: *const fn (ptr: *const anyopaque, timestamp_utc: i64) ?Offset,
+        offsetAtTimestamp: *const fn (ptr: *const anyopaque, timestamp_utc: i64) ?i32,
+        isDaylightSavingTimeAtTimestamp: *const fn (ptr: *const anyopaque, timestamp_utc: i64) ?bool,
+        designationAtTimestamp: *const fn (ptr: *const anyopaque, timestamp_utc: i64) ?[]const u8,
 
         /// Takes a list of typed functions and makes functions that take *anyopaque.
         /// Used when implementing a type that exposes a TimeZone interface.
         pub fn eraseTypes(comptime T: type, typed_vtable_functions: struct {
-            offsetAtTimestamp: *const fn (ptr: *const T, utc: i64) ?TimeZone.Offset,
+            offsetAtTimestamp: *const fn (ptr: *const T, utc: i64) ?i32,
+            isDaylightSavingTimeAtTimestamp: *const fn (ptr: *const T, timestamp_utc: i64) ?bool,
+            designationAtTimestamp: *const fn (ptr: *const T, timestamp_utc: i64) ?[]const u8,
         }) TimeZone.VTable {
             const generic_vtable_functions = struct {
-                fn offsetAtTimestamp(generic_ptr: *const anyopaque, utc: i64) ?TimeZone.Offset {
+                fn offsetAtTimestamp(generic_ptr: *const anyopaque, utc: i64) ?i32 {
                     const typed_ptr: *const T = @ptrCast(@alignCast(generic_ptr));
                     return typed_vtable_functions.offsetAtTimestamp(typed_ptr, utc);
+                }
+
+                fn isDaylightSavingTimeAtTimestamp(generic_ptr: *const anyopaque, utc: i64) ?bool {
+                    const typed_ptr: *const T = @ptrCast(@alignCast(generic_ptr));
+                    return typed_vtable_functions.isDaylightSavingTimeAtTimestamp(typed_ptr, utc);
+                }
+
+                fn designationAtTimestamp(generic_ptr: *const anyopaque, utc: i64) ?[]const u8 {
+                    const typed_ptr: *const T = @ptrCast(@alignCast(generic_ptr));
+                    return typed_vtable_functions.designationAtTimestamp(typed_ptr, utc);
                 }
             };
 
             return TimeZone.VTable{
                 .offsetAtTimestamp = generic_vtable_functions.offsetAtTimestamp,
+                .isDaylightSavingTimeAtTimestamp = generic_vtable_functions.isDaylightSavingTimeAtTimestamp,
+                .designationAtTimestamp = generic_vtable_functions.designationAtTimestamp,
             };
         }
     };
 
-    pub fn offsetAtTimestamp(this: *const @This(), utc: i64) ?Offset {
-        return this.vtable.offsetAtTimestamp(this.ptr, utc);
+    pub fn offsetAtTimestamp(this: *const @This(), timestamp_utc: i64) ?i32 {
+        return this.vtable.offsetAtTimestamp(this.ptr, timestamp_utc);
+    }
+
+    pub fn isDaylightSavingTimeAtTimestamp(this: *const @This(), timestamp_utc: i64) ?bool {
+        return this.vtable.isDaylightSavingTimeAtTimestamp(this.ptr, timestamp_utc);
+    }
+
+    pub fn designationAtTimestamp(this: *const @This(), timestamp_utc: i64) ?[]const u8 {
+        return this.vtable.designationAtTimestamp(this.ptr, timestamp_utc);
     }
 };
 

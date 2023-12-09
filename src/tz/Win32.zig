@@ -35,6 +35,8 @@ pub fn localTimeZone(gpa: std.mem.Allocator) !?@This() {
 
 pub const TIMEZONE_VTABLE = chrono.tz.TimeZone.VTable.eraseTypes(@This(), .{
     .offsetAtTimestamp = offsetAtTimestamp,
+    .isDaylightSavingTimeAtTimestamp = isDaylightSavingTimeAtTimestamp,
+    .designationAtTimestamp = designationAtTimestamp,
 });
 
 pub fn timeZone(this: *const @This()) chrono.tz.TimeZone {
@@ -44,7 +46,7 @@ pub fn timeZone(this: *const @This()) chrono.tz.TimeZone {
     };
 }
 
-pub fn offsetAtTimestamp(this: *const @This(), timestamp_utc: i64) ?chrono.tz.TimeZone.Offset {
+pub fn offsetAtTimestamp(this: *const @This(), timestamp_utc: i64) ?i32 {
     const ymd = chrono.date.YearMonthDay.fromDaysSinceUnixEpoch(@intCast(@divFloor(timestamp_utc, std.time.s_per_day)));
 
     var dynamic_time_zone_info = this.dynamic_time_zone_information;
@@ -54,78 +56,52 @@ pub fn offsetAtTimestamp(this: *const @This(), timestamp_utc: i64) ?chrono.tz.Ti
         return null;
     }
 
-    const end_dst = time_zone_info.StandardDate.toSecondsSinceUnixEpoch(ymd.year);
-    const start_dst = time_zone_info.DaylightDate.toSecondsSinceUnixEpoch(ymd.year);
-
-    if (start_dst < end_dst) {
-        if (timestamp_utc >= start_dst and timestamp_utc < end_dst) {
-            const dst_designation_utf16_len = std.mem.indexOfScalar(u16, &time_zone_info.DaylightName, 0) orelse time_zone_info.DaylightName.len;
-            var dst_designation_buf: [64]u8 = undefined;
-            const dst_designation_len = std.unicode.utf16leToUtf8(dst_designation_buf[0..], time_zone_info.DaylightName[0..dst_designation_utf16_len]) catch return null;
-            const dst_designation = dst_designation_buf[0..dst_designation_len];
-
-            const gop = this.string_pool.getOrPut(this.gpa, dst_designation) catch return null;
-            if (!gop.found_existing) {
-                gop.key_ptr.* = this.gpa.dupe(u8, dst_designation) catch return null;
-            }
-
-            return .{
-                .offset = (time_zone_info.Bias + time_zone_info.DaylightBias) * -std.time.s_per_min,
-                .designation = gop.key_ptr.*,
-                .is_daylight_saving_time = true,
-            };
-        } else {
-            const std_designation_utf16_len = std.mem.indexOfScalar(u16, &time_zone_info.StandardName, 0) orelse time_zone_info.StandardName.len;
-            var std_designation_buf: [64]u8 = undefined;
-            const std_designation_len = std.unicode.utf16leToUtf8(std_designation_buf[0..], time_zone_info.DaylightName[0..std_designation_utf16_len]) catch return null;
-            const std_designation = std_designation_buf[0..std_designation_len];
-
-            const gop = this.string_pool.getOrPut(this.gpa, std_designation) catch return null;
-            if (!gop.found_existing) {
-                gop.key_ptr.* = this.gpa.dupe(u8, std_designation) catch return null;
-            }
-
-            return .{
-                .offset = (time_zone_info.Bias + time_zone_info.StandardBias) * -std.time.s_per_min,
-                .designation = gop.key_ptr.*,
-                .is_daylight_saving_time = false,
-            };
-        }
+    if (time_zone_info.isDaylightSavingTimeAtTimestamp(timestamp_utc)) {
+        return (time_zone_info.Bias + time_zone_info.DaylightBias) * -std.time.s_per_min;
     } else {
-        if (timestamp_utc >= end_dst and timestamp_utc < start_dst) {
-            const std_designation_utf16_len = std.mem.indexOfScalar(u16, &time_zone_info.StandardName, 0) orelse time_zone_info.StandardName.len;
-            var std_designation_buf: [64]u8 = undefined;
-            const std_designation_len = std.unicode.utf16leToUtf8(std_designation_buf[0..], time_zone_info.DaylightName[0..std_designation_utf16_len]) catch return null;
-            const std_designation = std_designation_buf[0..std_designation_len];
-
-            const gop = this.string_pool.getOrPut(this.gpa, std_designation) catch return null;
-            if (!gop.found_existing) {
-                gop.key_ptr.* = this.gpa.dupe(u8, std_designation) catch return null;
-            }
-
-            return .{
-                .offset = (time_zone_info.Bias + time_zone_info.StandardBias) * -std.time.s_per_min,
-                .designation = gop.key_ptr.*,
-                .is_daylight_saving_time = false,
-            };
-        } else {
-            const dst_designation_utf16_len = std.mem.indexOfScalar(u16, &time_zone_info.DaylightName, 0) orelse time_zone_info.DaylightName.len;
-            var dst_designation_buf: [64]u8 = undefined;
-            const dst_designation_len = std.unicode.utf16leToUtf8(dst_designation_buf[0..], time_zone_info.DaylightName[0..dst_designation_utf16_len]) catch return null;
-            const dst_designation = dst_designation_buf[0..dst_designation_len];
-
-            const gop = this.string_pool.getOrPut(this.gpa, dst_designation) catch return null;
-            if (!gop.found_existing) {
-                gop.key_ptr.* = this.gpa.dupe(u8, dst_designation) catch return null;
-            }
-
-            return .{
-                .offset = (time_zone_info.Bias + time_zone_info.DaylightBias) * -std.time.s_per_min,
-                .designation = gop.key_ptr.*,
-                .is_daylight_saving_time = true,
-            };
-        }
+        return (time_zone_info.Bias + time_zone_info.StandardBias) * -std.time.s_per_min;
     }
+}
+
+pub fn isDaylightSavingTimeAtTimestamp(this: *const @This(), timestamp_utc: i64) ?bool {
+    const ymd = chrono.date.YearMonthDay.fromDaysSinceUnixEpoch(@intCast(@divFloor(timestamp_utc, std.time.s_per_day)));
+
+    var dynamic_time_zone_info = this.dynamic_time_zone_information;
+
+    var time_zone_info: TIME_ZONE_INFORMATION = undefined;
+    if (GetTimeZoneInformationForYear(@intCast(ymd.year), &dynamic_time_zone_info, &time_zone_info) == 0) {
+        return null;
+    }
+
+    return time_zone_info.isDaylightSavingTimeAtTimestamp(timestamp_utc);
+}
+
+pub fn designationAtTimestamp(this: *const @This(), timestamp_utc: i64) ?[]const u8 {
+    const ymd = chrono.date.YearMonthDay.fromDaysSinceUnixEpoch(@intCast(@divFloor(timestamp_utc, std.time.s_per_day)));
+
+    var dynamic_time_zone_info = this.dynamic_time_zone_information;
+
+    var time_zone_info: TIME_ZONE_INFORMATION = undefined;
+    if (GetTimeZoneInformationForYear(@intCast(ymd.year), &dynamic_time_zone_info, &time_zone_info) == 0) {
+        return null;
+    }
+
+    const designation_utf16 = if (time_zone_info.isDaylightSavingTimeAtTimestamp(timestamp_utc))
+        time_zone_info.DaylightName[0..]
+    else
+        time_zone_info.StandardName[0..];
+
+    const designation_utf16_len = std.mem.indexOfScalar(u16, designation_utf16, 0) orelse designation_utf16.len;
+    var designation_buf: [64]u8 = undefined;
+    const designation_len = std.unicode.utf16leToUtf8(designation_buf[0..], designation_utf16[0..designation_utf16_len]) catch return null;
+    const designation = designation_buf[0..designation_len];
+
+    const gop = this.string_pool.getOrPut(this.gpa, designation) catch return null;
+    if (!gop.found_existing) {
+        gop.key_ptr.* = this.gpa.dupe(u8, designation) catch return null;
+    }
+
+    return designation;
 }
 
 const TIME_ZONE_ID = enum(std.os.windows.DWORD) {
@@ -150,6 +126,27 @@ const TIME_ZONE_INFORMATION = extern struct {
     DaylightName: [32]std.os.windows.WCHAR,
     DaylightDate: SYSTEMTIME,
     DaylightBias: std.os.windows.LONG,
+
+    pub fn isDaylightSavingTimeAtTimestamp(time_zone_info: @This(), timestamp_utc: i64) bool {
+        const ymd = chrono.date.YearMonthDay.fromDaysSinceUnixEpoch(@intCast(@divFloor(timestamp_utc, std.time.s_per_day)));
+
+        const end_dst = time_zone_info.StandardDate.toSecondsSinceUnixEpoch(ymd.year);
+        const start_dst = time_zone_info.DaylightDate.toSecondsSinceUnixEpoch(ymd.year);
+
+        if (start_dst < end_dst) {
+            if (timestamp_utc >= start_dst and timestamp_utc < end_dst) {
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            if (timestamp_utc >= end_dst and timestamp_utc < start_dst) {
+                return false;
+            } else {
+                return true;
+            }
+        }
+    }
 
     pub fn format(
         this: @This(),

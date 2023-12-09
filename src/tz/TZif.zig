@@ -25,6 +25,8 @@ pub fn deinit(this: *@This()) void {
 
 pub const TIMEZONE_VTABLE = chrono.tz.TimeZone.VTable.eraseTypes(@This(), .{
     .offsetAtTimestamp = offsetAtTimestamp,
+    .isDaylightSavingTimeAtTimestamp = isDaylightSavingTimeAtTimestamp,
+    .designationAtTimestamp = designationAtTimestamp,
 });
 
 pub fn timeZone(this: *@This()) chrono.tz.TimeZone {
@@ -34,73 +36,91 @@ pub fn timeZone(this: *@This()) chrono.tz.TimeZone {
     };
 }
 
-pub fn offsetAtTimestamp(this: *const @This(), utc: i64) ?chrono.tz.TimeZone.Offset {
+pub fn offsetAtTimestamp(this: *const @This(), utc: i64) ?i32 {
     const transition_type_by_timestamp = getTransitionTypeByTimestamp(this.transitionTimes, utc);
     switch (transition_type_by_timestamp) {
-        .first_local_time_type => {
-            const local_time_type = this.localTimeTypes[0];
-
-            var designation = this.designations[local_time_type.designation_index .. this.designations.len - 1];
-            for (designation, 0..) |c, i| {
-                if (c == 0) {
-                    designation = designation[0..i];
-                    break;
-                }
-            }
-
-            return chrono.tz.TimeZone.Offset{
-                .offset = local_time_type.ut_offset,
-                .is_daylight_saving_time = local_time_type.is_daylight_saving_time,
-                .designation = designation,
-            };
-        },
+        .first_local_time_type => return this.localTimeTypes[0].ut_offset,
         .transition_index => |transition_index| {
             const local_time_type_idx = this.transitionTypes[transition_index];
             const local_time_type = this.localTimeTypes[local_time_type_idx];
-
-            var designation = this.designations[local_time_type.designation_index .. this.designations.len - 1];
-            for (designation, 0..) |c, i| {
-                if (c == 0) {
-                    designation = designation[0..i];
-                    break;
-                }
-            }
-
-            return chrono.tz.TimeZone.Offset{
-                .offset = local_time_type.ut_offset,
-                .is_daylight_saving_time = local_time_type.is_daylight_saving_time,
-                .designation = designation,
-            };
+            return local_time_type.ut_offset;
         },
         .specified_by_posix_tz,
         .specified_by_posix_tz_or_index_0,
         => if (this.posixTZ) |posixTZ| {
             // Base offset on the TZ string
-            const offset_res = posixTZ.offsetAtTimestamp(utc) orelse return null;
-            return chrono.tz.TimeZone.Offset{
-                .offset = offset_res.offset,
-                .is_daylight_saving_time = offset_res.is_daylight_saving_time,
-                .designation = offset_res.designation,
-            };
+            return posixTZ.offsetAtTimestamp(utc);
+        } else {
+            switch (transition_type_by_timestamp) {
+                .specified_by_posix_tz => return null,
+                .specified_by_posix_tz_or_index_0 => return this.localTimeTypes[0].ut_offset,
+                else => unreachable,
+            }
+        },
+    }
+}
+
+pub fn isDaylightSavingTimeAtTimestamp(this: *const @This(), utc: i64) ?bool {
+    const transition_type_by_timestamp = getTransitionTypeByTimestamp(this.transitionTimes, utc);
+    switch (transition_type_by_timestamp) {
+        .first_local_time_type => return this.localTimeTypes[0].is_daylight_saving_time,
+        .transition_index => |transition_index| {
+            const local_time_type_idx = this.transitionTypes[transition_index];
+            const local_time_type = this.localTimeTypes[local_time_type_idx];
+            return local_time_type.is_daylight_saving_time;
+        },
+        .specified_by_posix_tz,
+        .specified_by_posix_tz_or_index_0,
+        => if (this.posixTZ) |posixTZ| {
+            // Base offset on the TZ string
+            return posixTZ.isDaylightSavingTimeAtTimestamp(utc);
+        } else {
+            switch (transition_type_by_timestamp) {
+                .specified_by_posix_tz => return null,
+                .specified_by_posix_tz_or_index_0 => {
+                    return this.localTimeTypes[0].is_daylight_saving_time;
+                },
+                else => unreachable,
+            }
+        },
+    }
+}
+
+pub fn designationAtTimestamp(this: *const @This(), utc: i64) ?[]const u8 {
+    const transition_type_by_timestamp = getTransitionTypeByTimestamp(this.transitionTimes, utc);
+    switch (transition_type_by_timestamp) {
+        .first_local_time_type => {
+            const local_time_type = this.localTimeTypes[0];
+
+            const designation_end = std.mem.indexOfScalarPos(u8, this.designations[0 .. this.designations.len - 1], local_time_type.designation_index, 0) orelse this.designations.len - 1;
+            const designation = this.designations[local_time_type.designation_index..designation_end];
+
+            return designation;
+        },
+        .transition_index => |transition_index| {
+            const local_time_type_idx = this.transitionTypes[transition_index];
+            const local_time_type = this.localTimeTypes[local_time_type_idx];
+
+            const designation_end = std.mem.indexOfScalarPos(u8, this.designations[0 .. this.designations.len - 1], local_time_type.designation_index, 0) orelse this.designations.len - 1;
+            const designation = this.designations[local_time_type.designation_index..designation_end];
+
+            return designation;
+        },
+        .specified_by_posix_tz,
+        .specified_by_posix_tz_or_index_0,
+        => if (this.posixTZ) |posixTZ| {
+            // Base offset on the TZ string
+            return posixTZ.designationAtTimestamp(utc);
         } else {
             switch (transition_type_by_timestamp) {
                 .specified_by_posix_tz => return null,
                 .specified_by_posix_tz_or_index_0 => {
                     const local_time_type = this.localTimeTypes[0];
 
-                    var designation = this.designations[local_time_type.designation_index .. this.designations.len - 1];
-                    for (designation, 0..) |c, i| {
-                        if (c == 0) {
-                            designation = designation[0..i];
-                            break;
-                        }
-                    }
+                    const designation_end = std.mem.indexOfScalarPos(u8, this.designations[0 .. this.designations.len - 1], local_time_type.designation_index, 0) orelse this.designations.len - 1;
+                    const designation = this.designations[local_time_type.designation_index..designation_end];
 
-                    return chrono.tz.TimeZone.Offset{
-                        .offset = local_time_type.ut_offset,
-                        .is_daylight_saving_time = local_time_type.is_daylight_saving_time,
-                        .designation = designation,
-                    };
+                    return designation;
                 },
                 else => unreachable,
             }
@@ -115,13 +135,15 @@ pub const ConversionResult = struct {
     designation: []const u8,
 };
 
-pub fn localTimeFromUTC(this: @This(), utc: i64) ?ConversionResult {
+fn localTimeFromUTC(this: @This(), utc: i64) ?ConversionResult {
     const offset = this.offsetAtTimestamp(utc) orelse return null;
+    const is_daylight_saving_time = this.isDaylightSavingTimeAtTimestamp(utc) orelse return null;
+    const designation = this.designationAtTimestamp(utc) orelse return null;
     return ConversionResult{
-        .timestamp = utc + offset.offset,
-        .offset = offset.offset,
-        .is_daylight_saving_time = offset.is_daylight_saving_time,
-        .designation = offset.designation,
+        .timestamp = utc + offset,
+        .offset = offset,
+        .is_daylight_saving_time = is_daylight_saving_time,
+        .designation = designation,
     };
 }
 
