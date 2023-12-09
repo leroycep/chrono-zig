@@ -1,6 +1,7 @@
 pub const Fixed = @import("./tz/Fixed.zig");
 pub const Posix = @import("./tz/Posix.zig");
 pub const TZif = @import("./tz/TZif.zig");
+pub const Win32 = @import("./tz/Win32.zig");
 
 pub const UTC = Fixed.init(0, "+00:00").timeZone();
 
@@ -11,6 +12,10 @@ pub const DataBase = struct {
 
     tzif_dir: ?std.fs.Dir,
     tzif_cache: std.StringHashMapUnmanaged(*TZif) = .{},
+
+    win32_timezones: if (platform_supports_win32) std.AutoHashMapUnmanaged(*Win32, void) else void = if (platform_supports_win32) .{},
+
+    const platform_supports_win32 = builtin.target.os.tag == .windows;
 
     pub fn init(gpa: std.mem.Allocator) !@This() {
         const cwd = std.fs.cwd();
@@ -47,6 +52,15 @@ pub const DataBase = struct {
             this.gpa.free(tzif.key_ptr.*);
         }
         this.tzif_cache.deinit(this.gpa);
+
+        if (platform_supports_win32) {
+            var win32_iter = this.win32_timezones.iterator();
+            while (win32_iter.next()) |win32| {
+                win32.key_ptr.*.deinit();
+                this.gpa.destroy(win32.key_ptr.*);
+            }
+            this.win32_timezones.deinit(this.gpa);
+        }
 
         if (this.tzif_dir) |*tzif_dir| {
             tzif_dir.close();
@@ -87,58 +101,79 @@ pub const DataBase = struct {
         const platform_supports_tz_env = true;
         const platform_supports_etc_localtime = true;
 
-        if (platform_supports_tz_env) parse_tz_env_var: {
-            const tz_env_var = this.tz_env_var orelse if (std.process.getEnvVarOwned(this.gpa, "TZ")) |tz_env| store_tz_env_var: {
-                this.tz_env_var = tz_env;
-                break :store_tz_env_var tz_env;
-            } else |err| switch (err) {
-                // Continue on to other methods if the environement variable is not found
-                error.EnvironmentVariableNotFound => break :parse_tz_env_var,
-                else => return err,
-            };
-
-            // TODO: Check for TZ strings starting with `:`
-            const posix = try this.gpa.create(Posix);
-            posix.* = try Posix.parse(tz_env_var);
-            return posix.timeZone();
+        if (platform_supports_tz_env) {
+            if (try this.getLocalTimeZoneFromTZEnvVar()) |new_timezone| {
+                return new_timezone;
+            }
         }
 
-        if (platform_supports_etc_localtime) parse_etc_localtime: {
-            const cwd = std.fs.cwd();
-
-            var path_to_localtime_buf: [std.fs.MAX_PATH_BYTES]u8 = undefined;
-            const path_to_localtime = cwd.readLink("/etc/localtime", &path_to_localtime_buf) catch |err| switch (err) {
-                error.FileNotFound => break :parse_etc_localtime,
-                else => return err,
-            };
-
-            // TODO: Make it not rely on the path containing "/zoneinfo/"?
-            var component_iter = try std.fs.path.componentIterator(path_to_localtime);
-            while (component_iter.next()) |component| {
-                if (std.mem.eql(u8, component.name, "zoneinfo")) {
-                    break;
-                }
-            } else {
-                return error.InvalidEtcLocalTimeSymlink;
+        if (platform_supports_win32) {
+            if (try Win32.localTimeZone(this.gpa)) |win32_timezone| {
+                const win32_timezone_ptr = try this.gpa.create(Win32);
+                win32_timezone_ptr.* = win32_timezone;
+                try this.win32_timezones.put(this.gpa, win32_timezone_ptr, {});
+                return win32_timezone.timeZone();
             }
+        }
 
-            var identifier_string = std.ArrayList(u8).init(this.gpa);
-            defer identifier_string.deinit();
-
-            while (component_iter.next()) |component| {
-                if (identifier_string.items.len > 0) try identifier_string.append('/');
-                try identifier_string.appendSlice(component.name);
+        if (platform_supports_etc_localtime) {
+            if (try this.getLocalTimeZoneFromEtcLocaltime()) |etc_localtime_timezone| {
+                return etc_localtime_timezone;
             }
-
-            const identifier = try Identifier.parse(identifier_string.items);
-            const timezone = try this.getTimeZone(identifier);
-
-            this.localtime_identifier = try identifier_string.toOwnedSlice();
-
-            return timezone;
         }
 
         return error.NotFound;
+    }
+
+    fn getLocalTimeZoneFromTZEnvVar(this: *@This()) !?TimeZone {
+        const tz_env_var = this.tz_env_var orelse if (std.process.getEnvVarOwned(this.gpa, "TZ")) |tz_env| store_tz_env_var: {
+            this.tz_env_var = tz_env;
+            break :store_tz_env_var tz_env;
+        } else |err| switch (err) {
+            // Continue on to other methods if the environement variable is not found
+            error.EnvironmentVariableNotFound => return null,
+            else => return err,
+        };
+
+        // TODO: Check for TZ strings starting with `:`
+        const posix = try this.gpa.create(Posix);
+        posix.* = try Posix.parse(tz_env_var);
+        return posix.timeZone();
+    }
+
+    fn getLocalTimeZoneFromEtcLocaltime(this: *@This()) !?TimeZone {
+        const cwd = std.fs.cwd();
+
+        var path_to_localtime_buf: [std.fs.MAX_PATH_BYTES]u8 = undefined;
+        const path_to_localtime = cwd.readLink("/etc/localtime", &path_to_localtime_buf) catch |err| switch (err) {
+            error.FileNotFound => return null,
+            else => return err,
+        };
+
+        // TODO: Make it not rely on the path containing "/zoneinfo/"?
+        var component_iter = try std.fs.path.componentIterator(path_to_localtime);
+        while (component_iter.next()) |component| {
+            if (std.mem.eql(u8, component.name, "zoneinfo")) {
+                break;
+            }
+        } else {
+            return error.InvalidEtcLocalTimeSymlink;
+        }
+
+        var identifier_string = std.ArrayList(u8).init(this.gpa);
+        defer identifier_string.deinit();
+
+        while (component_iter.next()) |component| {
+            if (identifier_string.items.len > 0) try identifier_string.append('/');
+            try identifier_string.appendSlice(component.name);
+        }
+
+        const identifier = try Identifier.parse(identifier_string.items);
+        const timezone = try this.getTimeZone(identifier);
+
+        this.localtime_identifier = try identifier_string.toOwnedSlice();
+
+        return timezone;
     }
 };
 
@@ -180,9 +215,10 @@ pub const TimeZone = struct {
     };
 
     pub const VTable = struct {
-        offsetAtTimestamp: *const fn (ptr: *const anyopaque, utc: i64) ?Offset,
+        offsetAtTimestamp: *const fn (ptr: *const anyopaque, timestamp_utc: i64) ?Offset,
 
         /// Takes a list of typed functions and makes functions that take *anyopaque.
+        /// Used when implementing a type that exposes a TimeZone interface.
         pub fn eraseTypes(comptime T: type, typed_vtable_functions: struct {
             offsetAtTimestamp: *const fn (ptr: *const T, utc: i64) ?TimeZone.Offset,
         }) TimeZone.VTable {
@@ -205,9 +241,11 @@ pub const TimeZone = struct {
 };
 
 test {
+    _ = Fixed;
     _ = Posix;
     _ = TZif;
 }
 
+const builtin = @import("builtin");
 const log = std.log.scoped(.chrono);
 const std = @import("std");

@@ -21,5 +21,5 @@ pub fn main() !void {
     const date = chrono.date.YearMonthDay.fromDaysSinceUnixEpoch(@intCast(@divFloor(timestamp_local, std.time.s_per_day)));
     const time = chrono.Time{ .secs = @intCast(@mod(timestamp_local, std.time.s_per_day)), .frac = 0 };
 
-    std.debug.print("The current date is {}, and the time is {} in the {s} timezone", .{ date, time, local_offset.designation });
+    std.debug.print("The current date is {}, and the time is {} in the {s} timezone\n", .{ date, time, local_offset.designation });
 }
