@@ -6,7 +6,8 @@ const SUPPORTED_TARGETS = [_]std.zig.CrossTarget{
     .{ .cpu_arch = .x86_64, .cpu_model = .baseline, .os_tag = .linux, .abi = .musl },
     .{ .cpu_arch = .x86_64, .cpu_model = .baseline, .os_tag = .linux, .abi = .none },
 
-    .{ .cpu_arch = .x86_64, .cpu_model = .baseline, .os_tag = .windows },
+    .{ .cpu_arch = .x86_64, .cpu_model = .baseline, .os_tag = .windows, .abi = .gnu },
+    .{ .cpu_arch = .x86_64, .cpu_model = .baseline, .os_tag = .windows, .abi = .msvc },
 };
 
 pub fn build(b: *Builder) void {
