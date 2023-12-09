@@ -1,37 +1,79 @@
 const std = @import("std");
 const Builder = std.build.Builder;
 
+const SUPPORTED_TARGETS = [_]std.zig.CrossTarget{
+    .{ .cpu_arch = .x86_64, .cpu_model = .baseline, .os_tag = .linux, .abi = .gnu },
+    .{ .cpu_arch = .x86_64, .cpu_model = .baseline, .os_tag = .linux, .abi = .musl },
+    .{ .cpu_arch = .x86_64, .cpu_model = .baseline, .os_tag = .linux, .abi = .none },
+};
+
 pub fn build(b: *Builder) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
     const should_install_examples = b.option(bool, "examples", "Whether to install the examples or not") orelse true;
+    const skip_non_native = b.option(bool, "skip-non-native", "Whether to skip building non-native tests and examples. Only applies to `run-tests-and-build-examples`") orelse false;
 
     const chrono = b.addModule("chrono", .{
         .source_file = .{ .path = "src/lib.zig" },
     });
 
+    const test_step = b.step("test", "Run tests for the current target");
     const check_step = b.step("run-tests-and-build-examples", "Runs tests and builds examples; run this to make sure everything works");
 
-    const test_exe = b.addTest(.{
-        .root_source_file = .{ .path = "src/lib.zig" },
+    buildTestsAndExamplesForTarget(b, .{
         .target = target,
         .optimize = optimize,
+        .chrono = chrono,
+        .should_install_examples = should_install_examples,
+        .test_step = test_step,
+        .check_step = check_step,
+    });
+
+    if (!skip_non_native) {
+        for (SUPPORTED_TARGETS) |cross_target| {
+            buildTestsAndExamplesForTarget(b, .{
+                .target = cross_target,
+                .optimize = optimize,
+                .chrono = chrono,
+                .should_install_examples = should_install_examples,
+                .test_step = null,
+                .check_step = check_step,
+            });
+        }
+    }
+}
+
+const TestsAndExamplesOptions = struct {
+    target: std.zig.CrossTarget,
+    optimize: std.builtin.OptimizeMode,
+    chrono: *std.Build.Module,
+    should_install_examples: bool,
+    test_step: ?*std.Build.Step,
+    check_step: *std.Build.Step,
+};
+
+pub fn buildTestsAndExamplesForTarget(b: *Builder, options: TestsAndExamplesOptions) void {
+    const test_exe = b.addTest(.{
+        .root_source_file = .{ .path = "src/lib.zig" },
+        .target = options.target,
+        .optimize = options.optimize,
     });
 
     const run_tests = b.addRunArtifact(test_exe);
 
-    const run_tests_step = b.step("test", "Test everything");
-    run_tests_step.dependOn(&run_tests.step);
+    if (options.test_step) |test_step| {
+        test_step.dependOn(&run_tests.step);
+    }
 
-    check_step.dependOn(&run_tests.step);
+    options.check_step.dependOn(&run_tests.step);
 
     addExample(b, .{
         .name = "print-local-datetime",
-        .target = target,
-        .optimize = optimize,
-        .chrono = chrono,
-        .should_install = should_install_examples,
-        .check_step = check_step,
+        .target = options.target,
+        .optimize = options.optimize,
+        .chrono = options.chrono,
+        .should_install = options.should_install_examples,
+        .check_step = options.check_step,
     });
 }
 
