@@ -13,6 +13,8 @@ pub const DataBase = struct {
     tzif_dir: ?std.fs.Dir,
     tzif_cache: std.StringHashMapUnmanaged(*TZif) = .{},
 
+    /// A hashmap mapping Windows' timezone keys to IANA timezone keys
+    win32_timezone_mapping: if (platform_supports_win32) *Win32.mapping.WindowsToIANAHashmap else void,
     win32_timezones: if (platform_supports_win32) std.AutoHashMapUnmanaged(*Win32, void) else void = if (platform_supports_win32) .{},
 
     const platform_supports_win32 = builtin.target.os.tag == .windows;
@@ -31,9 +33,15 @@ pub const DataBase = struct {
 
         const tzif_dir: ?std.fs.Dir = tzdir_err_opt catch null;
 
+        const win32_timezone_key_mapping = if (platform_supports_win32) try gpa.create(Win32.mapping.WindowsToIANAHashmap);
+        if (platform_supports_win32) {
+            win32_timezone_key_mapping.* = try Win32.mapping.constructWindowsToIANAHashmap(gpa);
+        }
+
         return @This(){
             .gpa = gpa,
             .tzif_dir = tzif_dir,
+            .win32_timezone_mapping = win32_timezone_key_mapping,
         };
     }
 
@@ -108,7 +116,7 @@ pub const DataBase = struct {
         }
 
         if (platform_supports_win32) {
-            if (try Win32.localTimeZone(this.gpa)) |win32_timezone| {
+            if (try Win32.localTimeZone(this.gpa, this.win32_timezone_mapping)) |win32_timezone| {
                 const win32_timezone_ptr = try this.gpa.create(Win32);
                 win32_timezone_ptr.* = win32_timezone;
                 try this.win32_timezones.put(this.gpa, win32_timezone_ptr, {});

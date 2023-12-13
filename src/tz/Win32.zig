@@ -2,7 +2,14 @@
 
 gpa: std.mem.Allocator,
 dynamic_time_zone_information: TIME_DYNAMIC_ZONE_INFORMATION,
+
+/// Holds onto timezone designations for the user
 string_pool: *std.StringHashMapUnmanaged(void),
+
+/// A hashmap mapping Windows' timezone keys to IANA timezone keys
+timezone_mapping: *const mapping.WindowsToIANAHashmap,
+
+pub const mapping = @import("./Win32/mapping.zig");
 
 pub fn deinit(this: *@This()) void {
     var string_iter = this.string_pool.iterator();
@@ -13,7 +20,7 @@ pub fn deinit(this: *@This()) void {
     this.gpa.destroy(this.string_pool);
 }
 
-pub fn localTimeZone(gpa: std.mem.Allocator) !?@This() {
+pub fn localTimeZone(gpa: std.mem.Allocator, timezone_mapping: *const mapping.WindowsToIANAHashmap) !?@This() {
     const string_pool = try gpa.create(std.StringHashMapUnmanaged(void));
     string_pool.* = .{};
 
@@ -21,6 +28,7 @@ pub fn localTimeZone(gpa: std.mem.Allocator) !?@This() {
         .gpa = gpa,
         .string_pool = string_pool,
         .dynamic_time_zone_information = undefined,
+        .timezone_mapping = timezone_mapping,
     };
     switch (GetDynamicTimeZoneInformation(&this.dynamic_time_zone_information)) {
         .UNKNOWN,
