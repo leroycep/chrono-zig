@@ -8,7 +8,10 @@
 //!
 //! From CLDR release v44, 2023-10-31
 
-pub const TimeZoneTerritory = std.meta.Tuple(&[_]type{ []const u16, ?[]const u16 });
+pub const TimeZoneTerritory = struct {
+    name: []const u16,
+    territory: ?[2]u8,
+};
 pub const WindowsToIANAHashmap = std.HashMapUnmanaged(TimeZoneTerritory, []const chrono.tz.Identifier, TimeZoneTerritoryContext, 80);
 
 pub fn constructWindowsToIANAHashmap(gpa: std.mem.Allocator) !WindowsToIANAHashmap {
@@ -32,53 +35,49 @@ pub fn constructWindowsToIANAHashmap(gpa: std.mem.Allocator) !WindowsToIANAHashm
             const timezone_key_utf16_len = try std.unicode.utf8ToUtf16Le(timezone_key_utf16, datapoint.windows_key);
             std.debug.assert(timezone_key_utf16_len == datapoint.windows_key.len);
 
-            key[0] = timezone_key_utf16;
+            key.name = timezone_key_utf16;
         }
 
         if (datapoint.windows_territory) |territory| {
-            const territory_utf16 = try gpa.alloc(u16, territory.len);
-            const territory_utf16_len = try std.unicode.utf8ToUtf16Le(territory_utf16, territory);
-            std.debug.assert(territory_utf16_len == territory.len);
-
-            key[1] = territory_utf16;
+            key.territory = territory.*;
         } else {
-            key[1] = null;
+            key.territory = null;
         }
 
-        map.putAssumeCapacity(key, try identifiers.toOwnedSlice());
+        map.putAssumeCapacityNoClobber(key, try identifiers.toOwnedSlice());
     }
 
     return map;
 }
 
-pub fn freeWindowsToIANAHashmap(gpa: std.mem.Allocator, map: WindowsToIANAHashmap) void {
-    var iter = map.keyIterator();
-    while (iter.next()) |key| {
-        gpa.free(key[0]);
-        gpa.free(key[1]);
+pub fn freeWindowsToIANAHashmap(gpa: std.mem.Allocator, map: *WindowsToIANAHashmap) void {
+    var iter = map.iterator();
+    while (iter.next()) |entry| {
+        gpa.free(entry.key_ptr.name);
+        gpa.free(entry.value_ptr.*);
     }
-    map.deinit();
+    map.deinit(gpa);
 }
 
 pub const TimeZoneTerritoryContext = struct {
     pub fn hash(this: @This(), tz_key: TimeZoneTerritory) u64 {
         _ = this;
         var wy_hash = std.hash.Wyhash.init(0);
-        wy_hash.update(std.mem.sliceAsBytes(tz_key[0]));
+        wy_hash.update(std.mem.sliceAsBytes(tz_key.name));
         wy_hash.update(&[_]u8{ 0, 0 });
-        if (tz_key[1]) |territory| wy_hash.update(std.mem.sliceAsBytes(territory));
+        if (tz_key.territory) |territory| wy_hash.update(territory[0..]);
         return wy_hash.final();
     }
     pub fn eql(this: @This(), a: TimeZoneTerritory, b: TimeZoneTerritory) bool {
         _ = this;
-        if (a[1]) |a_territory| {
-            if (b[1]) |b_territory| {
-                return std.mem.eql(u16, a[0], b[0]) and std.mem.eql(u16, a_territory, b_territory);
+        if (a.territory) |a_territory| {
+            if (b.territory) |b_territory| {
+                return std.mem.eql(u16, a.name, b.name) and std.mem.eql(u8, a_territory[0..], b_territory[0..]);
             } else {
                 return false;
             }
         }
-        return std.mem.eql(u16, a[0], b[0]);
+        return std.mem.eql(u16, a.name, b.name);
     }
 };
 
@@ -87,15 +86,13 @@ pub const WINDOWS_TZ_VERSION: std.os.windows.DWORD = 0x7e11800;
 
 pub const WindowsToIANA = struct {
     windows_key: []const u8,
-    windows_territory: ?[]const u8,
+    windows_territory: ?*const [2]u8,
     /// A string containing space separated IANA identifiers
     iana_identifiers: []const u8,
 };
 
 pub const DATA = [_]WindowsToIANA{
     // <!-- (UTC-12:00) International Date Line West -->
-    .{ .windows_key = "Dateline Standard Time", .windows_territory = null, .iana_identifiers = "Etc/GMT+12" },
-
     .{ .windows_key = "Dateline Standard Time", .windows_territory = null, .iana_identifiers = "Etc/GMT+12" },
     .{ .windows_key = "Dateline Standard Time", .windows_territory = "ZZ", .iana_identifiers = "Etc/GMT+12" },
 

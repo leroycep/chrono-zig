@@ -68,6 +68,9 @@ pub const DataBase = struct {
                 this.gpa.destroy(win32.key_ptr.*);
             }
             this.win32_timezones.deinit(this.gpa);
+
+            Win32.mapping.freeWindowsToIANAHashmap(this.gpa, this.win32_timezone_mapping);
+            this.gpa.destroy(this.win32_timezone_mapping);
         }
 
         if (this.tzif_dir) |*tzif_dir| {
@@ -120,7 +123,8 @@ pub const DataBase = struct {
                 const win32_timezone_ptr = try this.gpa.create(Win32);
                 win32_timezone_ptr.* = win32_timezone;
                 try this.win32_timezones.put(this.gpa, win32_timezone_ptr, {});
-                return win32_timezone.timeZone();
+
+                return win32_timezone_ptr.timeZone();
             }
         }
 
@@ -221,12 +225,16 @@ pub const TimeZone = struct {
         isDaylightSavingTimeAtTimestamp: *const fn (ptr: *const anyopaque, timestamp_utc: i64) ?bool,
         designationAtTimestamp: *const fn (ptr: *const anyopaque, timestamp_utc: i64) ?[]const u8,
 
+        /// Should return and IANA (Olson database) identifer
+        identifier: *const fn (ptr: *const anyopaque) ?Identifier,
+
         /// Takes a list of typed functions and makes functions that take *anyopaque.
         /// Used when implementing a type that exposes a TimeZone interface.
         pub fn eraseTypes(comptime T: type, typed_vtable_functions: struct {
             offsetAtTimestamp: *const fn (ptr: *const T, utc: i64) ?i32,
             isDaylightSavingTimeAtTimestamp: *const fn (ptr: *const T, timestamp_utc: i64) ?bool,
             designationAtTimestamp: *const fn (ptr: *const T, timestamp_utc: i64) ?[]const u8,
+            identifier: *const fn (ptr: *const T) ?Identifier,
         }) TimeZone.VTable {
             const generic_vtable_functions = struct {
                 fn offsetAtTimestamp(generic_ptr: *const anyopaque, utc: i64) ?i32 {
@@ -243,12 +251,18 @@ pub const TimeZone = struct {
                     const typed_ptr: *const T = @ptrCast(@alignCast(generic_ptr));
                     return typed_vtable_functions.designationAtTimestamp(typed_ptr, utc);
                 }
+
+                fn identifier(generic_ptr: *const anyopaque) ?Identifier {
+                    const typed_ptr: *const T = @ptrCast(@alignCast(generic_ptr));
+                    return typed_vtable_functions.identifier(typed_ptr);
+                }
             };
 
             return TimeZone.VTable{
                 .offsetAtTimestamp = generic_vtable_functions.offsetAtTimestamp,
                 .isDaylightSavingTimeAtTimestamp = generic_vtable_functions.isDaylightSavingTimeAtTimestamp,
                 .designationAtTimestamp = generic_vtable_functions.designationAtTimestamp,
+                .identifier = generic_vtable_functions.identifier,
             };
         }
     };
@@ -263,6 +277,10 @@ pub const TimeZone = struct {
 
     pub fn designationAtTimestamp(this: *const @This(), timestamp_utc: i64) ?[]const u8 {
         return this.vtable.designationAtTimestamp(this.ptr, timestamp_utc);
+    }
+
+    pub fn identifier(this: *const @This()) ?Identifier {
+        return this.vtable.identifier(this.ptr);
     }
 };
 

@@ -1,13 +1,13 @@
 //! Implements looking up timezone information based on the Win32 APIs for date and time.
 
 gpa: std.mem.Allocator,
-dynamic_time_zone_information: TIME_DYNAMIC_ZONE_INFORMATION,
-
 /// Holds onto timezone designations for the user
 string_pool: *std.StringHashMapUnmanaged(void),
 
 /// A hashmap mapping Windows' timezone keys to IANA timezone keys
 timezone_mapping: *const mapping.WindowsToIANAHashmap,
+
+dynamic_time_zone_information: TIME_DYNAMIC_ZONE_INFORMATION,
 
 pub const mapping = @import("./Win32/mapping.zig");
 
@@ -45,6 +45,7 @@ pub const TIMEZONE_VTABLE = chrono.tz.TimeZone.VTable.eraseTypes(@This(), .{
     .offsetAtTimestamp = offsetAtTimestamp,
     .isDaylightSavingTimeAtTimestamp = isDaylightSavingTimeAtTimestamp,
     .designationAtTimestamp = designationAtTimestamp,
+    .identifier = identifier,
 });
 
 pub fn timeZone(this: *const @This()) chrono.tz.TimeZone {
@@ -109,8 +110,58 @@ pub fn designationAtTimestamp(this: *const @This(), timestamp_utc: i64) ?[]const
         gop.key_ptr.* = this.gpa.dupe(u8, designation) catch return null;
     }
 
-    return designation;
+    return gop.key_ptr.*;
 }
+
+pub fn identifier(this: *const @This()) ?chrono.tz.Identifier {
+    const key_name_len = std.mem.indexOfScalar(u16, this.dynamic_time_zone_information.TimeZoneKeyName[0..], 0) orelse this.dynamic_time_zone_information.TimeZoneKeyName.len;
+    const key_name = this.dynamic_time_zone_information.TimeZoneKeyName[0..key_name_len];
+
+    if (tryGetRegion()) |region| {
+        if (this.timezone_mapping.get(.{ .name = key_name, .territory = region })) |iana_identifier| {
+            return iana_identifier[0];
+        }
+    }
+
+    if (this.timezone_mapping.get(.{ .name = key_name, .territory = null })) |iana_identifier| {
+        return iana_identifier[0];
+    }
+
+    return null;
+}
+
+fn tryGetRegion() ?[2]u8 {
+    // we need the buffer to be at least 3 bytes long to hold a null byte at the end
+    var iso_2letter_region: [3]u8 = undefined;
+
+    const geoid = GetUserGeoID(.NATION);
+
+    if (GetGeoInfoA(geoid, .ISO2, &iso_2letter_region, iso_2letter_region.len, .NONE) == 0) {
+        return null;
+    }
+
+    return iso_2letter_region[0..2].*;
+}
+
+const GEOCLASS = enum(c_int) {
+    NATION = 16,
+    _,
+};
+
+const GEOID = c_int;
+
+const GEOTYPE = enum(c_int) {
+    ISO2 = 0x004,
+    _,
+};
+
+const LANGID = enum(c_int) {
+    NONE = 0,
+    _,
+};
+
+extern fn GetUserGeoID(GEOCLASS) GEOID;
+extern fn GetGeoInfoA(GEOID, GEOTYPE, out_ptr: ?[*]u8, out_len: c_int, LANGID) c_int;
 
 const TIME_ZONE_ID = enum(std.os.windows.DWORD) {
     UNKNOWN = 0,

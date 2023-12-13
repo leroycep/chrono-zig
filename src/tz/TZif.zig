@@ -27,6 +27,7 @@ pub const TIMEZONE_VTABLE = chrono.tz.TimeZone.VTable.eraseTypes(@This(), .{
     .offsetAtTimestamp = offsetAtTimestamp,
     .isDaylightSavingTimeAtTimestamp = isDaylightSavingTimeAtTimestamp,
     .designationAtTimestamp = designationAtTimestamp,
+    .identifier = identifier,
 });
 
 pub fn timeZone(this: *@This()) chrono.tz.TimeZone {
@@ -126,6 +127,11 @@ pub fn designationAtTimestamp(this: *const @This(), utc: i64) ?[]const u8 {
             }
         },
     }
+}
+
+pub fn identifier(this: *const @This()) ?chrono.tz.Identifier {
+    _ = this;
+    return null;
 }
 
 pub const ConversionResult = struct {
