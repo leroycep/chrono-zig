@@ -3,7 +3,22 @@ pub const Posix = @import("./tz/Posix.zig");
 pub const TZif = @import("./tz/TZif.zig");
 pub const Win32 = @import("./tz/Win32.zig");
 
-pub const UTC = Fixed.init(0, "+00:00").timeZone();
+pub const UTC = (Fixed{
+    .offset = 0,
+    .designation = "+00:00",
+    .iana_identifier = Identifier.parse("UTC") catch unreachable,
+}).timeZone();
+
+// Make sure that the UTC timezone works
+test UTC {
+    try std.testing.expectEqual(@as(?i32, 0), UTC.offsetAtTimestamp(0));
+    try std.testing.expectEqual(@as(?i32, 0), UTC.offsetAtTimestamp(1331438400));
+
+    try std.testing.expectEqualStrings("+00:00", UTC.designationAtTimestamp(0) orelse return error.TestExpectedEqual);
+    try std.testing.expectEqualStrings("+00:00", UTC.designationAtTimestamp(1331438400) orelse return error.TestExpectedEqual);
+
+    try std.testing.expectEqualStrings("UTC", UTC.identifier().?.string);
+}
 
 pub const DataBase = struct {
     gpa: std.mem.Allocator,
