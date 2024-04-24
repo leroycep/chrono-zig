@@ -1,0 +1,14 @@
+.{
+    .name = "chrono",
+    .version = "0.0.0",
+    .minimum_zig_version = "0.12.0",
+
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "examples",
+        "LICENSE",
+        "README.md",
+    },
+}
